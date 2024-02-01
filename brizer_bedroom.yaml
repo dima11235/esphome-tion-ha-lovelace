@@ -1,0 +1,548 @@
+# Пакет для управления бризером Тион с интеграцией ESPHOME из интерфейса Home Assistant
+
+# 1. Сделайте "Поиск и замену" по файлу всех вхождений строки "brizer_bedroom" на имя вашего climate устройства бризера
+
+# 2. Если ее нет, то добавьте в секцию homeassistant файла /homeassistant/configuration.yaml дерективу packages с указанием каталога с пакетами
+# Например:
+# homeassistant:
+#   packages: !include_dir_merge_named includes/packages
+
+# 3. Если ее нет, то добавьте секцию logger и включите отладочные сообщения для custom_components.tion
+# Например:
+# logger:
+#   default: warning
+#   logs:
+#     custom_components.tion: debug
+    
+# 4. Выложите файл в каталог с пакетами, например /homeassistant/includes/packages
+
+# 5. Перезагрузите Home Assistant и проверьте, что все объекты описанные ниже появились в  Home Assistant
+
+climate_devices_brizer_bedroom:
+
+    # Элементы, предоставляемые бризером для управления из интерфейса
+  
+    # Включение автоматического режима
+    # switch.brizer_bedroom_auto_fan_mode
+
+    # Включение тихого режима
+    # switch.brizer_bedroom_silent_mode
+  
+    # Целевой уровень CO₂
+    # number.brizer_bedroom_target_co2
+  
+    # Текущая скорость вентилятора 0-6
+    # sensor.brizer_bedroom_fan_speed
+  
+    # Минимальная скорость в автоматическом режиме
+    # number.brizer_bedroom_min_fan_speed
+  
+    # Максимальная скорость в автоматическом режиме
+    # number.brizer_bedroom_max_fan_speed
+  
+    # Дополнительные элементы для управления бризером из интерфейса
+    # Не предоставляются устройством напрямую и работают через автоматизации ниже
+  
+  input_number:
+  
+    # Слайдер для управления установленной температурой нагревателя из интерфейса
+    brizer_bedroom_heater_temperature:
+      name: "Установленная температура"
+      min: 0
+      max: 30
+      step: 1
+      mode: slider
+      icon: mdi:thermometer
+      unit_of_measurement: "°C"
+
+  input_boolean:
+  
+    # Выключатель бризера из интерфейса
+    brizer_bedroom_on:
+      name: "Включен"
+      icon: mdi:power
+      
+    # Выключатель подогрева воздуха из интерфейса
+    brizer_bedroom_heater:
+      name: "Режим подогрева"
+      icon: mdi:fire
+
+    # Переменные для установки диапазона скоростей бризера из интерфейса
+    brizer_bedroom_speed0:
+      name: "Скорость 0"
+      icon: mdi:numeric-0-box-outline
+    brizer_bedroom_speed1:
+      name: "Скорость 1"
+      icon: mdi:numeric-1-box-outline
+    brizer_bedroom_speed2:
+      name: "Скорость 2"
+      icon: mdi:numeric-2-box-outline
+    brizer_bedroom_speed3:
+      name: "Скорость 3"
+      icon: mdi:numeric-3-box-outline
+    brizer_bedroom_speed4:
+      name: "Скорость 4"
+      icon: mdi:numeric-4-box-outline
+    brizer_bedroom_speed5:
+      name: "Скорость 5"
+      icon: mdi:numeric-5-box-outline
+    brizer_bedroom_speed6:
+      name: "Скорость 6"
+      icon: mdi:numeric-6-box-outline
+    
+    # Переменная включается, когда в интерфейсе выбрана первая (минимальная) скорость и показывает, что следующим кликом будет устанавливаться максимальная скорость.
+    # Переменная сбрасывается после установки второй скорости, либо по таймеру timer.brizer_bedroom_set_speed_n_m.
+    brizer_bedroom_set_speed_n_m:
+      initial: "off"
+      
+  timer:
+  
+    # Таймер времени на установку второй скорости в интерфейсе. По окончанию таймера результат установки скоростей отправляется на бризер.
+    # Если была установлена только первая скорость - бризер переводится в ручной режим с этой скоростью.
+    # Если за время таймера была установлена также вторая скорость - бризер переводится в автоматический режим с указанным диапазоном скоростей.
+    brizer_bedroom_set_speed_n_m:
+      duration: "00:00:03"
+      
+  template: 
+  
+    # Сенсор истории режимов работы бризера в формате '1-2:750'
+    - sensor:
+        - name: brizer_bedroom_status
+          unique_id: brizer_bedroom_status
+          state: >
+            {% if is_state('switch.brizer_bedroom_auto_fan_mode','on') %}
+                {{ states('number.brizer_bedroom_min_fan_speed') | int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed') | int(none) }}:{{ states('number.brizer_bedroom_target_co2') | int(none) }}
+            {% elif is_state('climate.brizer_bedroom','off') %}
+                0
+            {% else %}
+                {{ states('sensor.brizer_bedroom_fan_speed') | int(none) }}
+            {% endif %}
+          icon: >
+            {% if is_state('switch.brizer_bedroom_auto_fan_mode','on') %}
+                mdi:fan-auto
+            {% elif is_state('climate.brizer_bedroom','off') %}
+                mdi:fan-off
+            {% else %}
+                mdi:fan
+            {% endif %}
+          # Автообновление сенсора каждый час, чтобы не пропадали графики
+          attributes:
+            hour_last_updated: "{{ now().hour }}"
+
+  automation:
+
+    # Автоматизация синхронизации состояния бризера и дополнитлеьных элементов управления 
+
+    - alias: brizer_bedroom_update
+      id: brizer_bedroom_update
+      initial_state: true
+      mode: queued
+      trigger:
+        - platform: homeassistant
+          event: start
+          id: update_controls
+          
+        - platform: state
+          entity_id: climate.brizer_bedroom
+          id: update_controls
+          
+        - platform: state
+          entity_id: input_boolean.brizer_bedroom_on
+          id: update_onoff
+
+        - platform: state
+          entity_id: input_boolean.brizer_bedroom_heater
+          id: update_heater
+
+        - platform: state
+          entity_id: input_number.brizer_bedroom_heater_temperature
+          id: update_temperature
+      action:
+        - choose:
+            # Включение/выключение бризера
+            - conditions: >
+                {{ trigger.id == 'update_onoff' }}
+              sequence:
+                - choose:
+                    # Включение бризера
+                    - conditions: "{{ is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','on') }}"
+                      sequence:
+                        - service: climate.turn_on
+                          entity_id: climate.brizer_bedroom
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_device "on"
+                            level: info
+                            logger: custom_components.tion.automation
+
+                        # Включение автоматического режима, если установлены разные минимальная и максимальная скорости
+                        - choose:
+                            - conditions: >
+                                {% set min_speed = states('number.brizer_bedroom_min_fan_speed')|int(none) %}
+                                {% set max_speed = states('number.brizer_bedroom_max_fan_speed')|int(none) %}
+                                {{ min_speed|is_number and max_speed|is_number and min_speed != max_speed }}
+                              sequence:
+                                - service: switch.turn_on
+                                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+                                - service: system_log.write
+                                  data:
+                                    message: >-
+                                      brizer_bedroom_update: update_device auto mode on "{{ states('number.brizer_bedroom_min_fan_speed')|int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}:{{ states('number.brizer_bedroom_target_co2')|int(none) }}"
+                                    level: info
+                                    logger: custom_components.tion.automation
+
+                    # Выключение бризера
+                    - conditions: "{{ not is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','off') }}"
+                      sequence:
+                        # Выключение автоматического режима, чтобы он сам не включал бризер
+                        - service: switch.turn_off
+                          entity_id: switch.brizer_bedroom_auto_fan_mode
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_interface_update: update_device auto mode "off"
+                            level: info
+                            logger: custom_components.tion.automation
+
+                        - service: climate.turn_off
+                          entity_id: climate.brizer_bedroom
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_device "off"
+                            level: info
+                            logger: custom_components.tion.automation
+
+        # Включение/выключение подогрева воздуха
+        - choose:
+            - conditions: >
+                {{ trigger.id == 'update_heater' }}
+              sequence:
+                - service: climate.set_hvac_mode
+                  data:
+                    entity_id: climate.brizer_bedroom
+                    hvac_mode: "{{ 'heat' if is_state('input_boolean.brizer_bedroom_heater','on') else 'fan_only' }}"
+
+                - service: system_log.write
+                  data:
+                    message: >-
+                      brizer_bedroom_update: update_device {{ 'heat' if is_state('input_boolean.brizer_bedroom_heater','on') else 'fan_only' }}
+                    level: info
+                    logger: custom_components.tion.automation
+
+        # Изменение температуры подогрева воздуха
+        - choose:
+            - conditions: >
+                {{ trigger.id == 'update_temperature' }}
+              sequence:
+                - choose:
+                    - conditions: >
+                        {% set state_device = state_attr('climate.brizer_bedroom','temperature')|float(none) %}
+                        {% set state_control = states('input_number.brizer_bedroom_heater_temperature')|float(none) %}
+                        {{ state_device|is_number and state_control|is_number and state_device != state_control }}
+                      sequence:
+                        - service: climate.set_temperature
+                          target:
+                            entity_id: climate.brizer_bedroom
+                          data:
+                            temperature: "{{ states('input_number.brizer_bedroom_heater_temperature')|float(none) }}"
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_device: temperature "{{ states('input_number.brizer_bedroom_heater_temperature')|float(none) }}"
+                            level: info
+                            logger: custom_components.tion.automation
+
+        - choose:
+            - conditions: >
+                {{ trigger.id == 'update_controls' }}
+              sequence:
+                # Обновление значения переменной input_boolean.brizer_bedroom_on при включении/выключении бризера
+                - choose:
+                    - conditions: "{{ is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','on') }}"
+                      sequence:
+                        - service: input_boolean.turn_off
+                          entity_id: input_boolean.brizer_bedroom_on
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_control "off"
+                            level: info
+                            logger: custom_components.tion.automation
+
+                    - conditions: "{{ not is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','off') }}"
+                      sequence:
+                        - service: input_boolean.turn_on
+                          entity_id: input_boolean.brizer_bedroom_on
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_control "on"
+                            level: info
+                            logger: custom_components.tion.automation
+              
+                # Обновление значения переменной input_boolean.brizer_bedroom_heater при включении/отключении подогрева
+                - choose:
+                    - conditions: "{{ is_state('climate.brizer_bedroom','fan_only') and is_state('input_boolean.brizer_bedroom_heater','on') }}"
+                      sequence:
+                        - service: input_boolean.turn_off
+                          entity_id: input_boolean.brizer_bedroom_heater
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_control: heater "off"
+                            level: info
+                            logger: custom_components.tion.automation
+
+                    - conditions: "{{ is_state('climate.brizer_bedroom','heat') and is_state('input_boolean.brizer_bedroom_heater','off') }}"
+                      sequence:
+                        - service: input_boolean.turn_on
+                          entity_id: input_boolean.brizer_bedroom_heater
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_control heater "on"
+                            level: info
+                            logger: custom_components.tion.automation
+
+                # Обновление значения переменной input_number.brizer_bedroom_heater_temperature при изменении целевой температуры
+                - choose:
+                    - conditions: >
+                        {% set state_device = state_attr('climate.brizer_bedroom','temperature')|float(none) %}
+                        {% set state_control = states('input_number.brizer_bedroom_heater_temperature')|float(none) %}
+                        {{ state_device|is_number and state_control|is_number and state_device != state_control }}
+                      sequence:
+                        - service: input_number.set_value
+                          target:
+                            entity_id: input_number.brizer_bedroom_heater_temperature
+                          data:
+                            value: "{{ state_attr('climate.brizer_bedroom','temperature')|float(none) }}"
+
+                        - service: system_log.write
+                          data:
+                            message: >-
+                              brizer_bedroom_update: update_control temperature "{{ state_attr('climate.brizer_bedroom','temperature')|float(none) }}"
+                            level: info
+                            logger: custom_components.tion.automation
+
+
+    # Обновление значения скорости/диапазона скоростей в интерфейсе через единичные переменные скоростей 0-6
+    # Включение и отключение автоматического режима управления скоростью вентилятора
+
+    - alias: brizer_bedroom_set_fan_mode
+      id: brizer_bedroom_set_fan_mode
+      initial_state: true
+      mode: queued
+      trigger:
+        - platform: state
+          entity_id: number.brizer_bedroom_min_fan_speed, number.brizer_bedroom_max_fan_speed
+      action:
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 0 and 0 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed0
+
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 1 and 1 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed1
+
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 2 and 2 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed2
+
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 3 and 3 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed3
+
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 4 and 4 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed4
+
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 5 and 5 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed5
+
+        - service_template: >
+            {% if states('number.brizer_bedroom_min_fan_speed')|int(-1) <= 6 and 6 <= states('number.brizer_bedroom_max_fan_speed')|int(-1) %}
+                input_boolean.turn_on
+            {% else %}
+                input_boolean.turn_off
+            {% endif %}
+          entity_id: input_boolean.brizer_bedroom_speed6
+
+        # Включение автоматического режима, если минимальная и максимальная скорости отличаются и выключение автоматического режима, если скорости одинаковые.
+        - choose:
+            - conditions: >
+                {% set min_speed = states('number.brizer_bedroom_min_fan_speed')|int(none) %}
+                {% set max_speed = states('number.brizer_bedroom_max_fan_speed')|int(none) %}
+                {{ min_speed|is_number and max_speed|is_number and min_speed == max_speed }}
+                
+              sequence:
+                - service: switch.turn_off
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+                - service: system_log.write
+                  data:
+                    message: >-
+                      brizer_bedroom_set_fan_mode: update_device auto mode off "{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}"
+                    level: info
+                    logger: custom_components.tion.automation
+
+            - conditions: >
+                {% set min_speed = states('number.brizer_bedroom_min_fan_speed')|int(none) %}
+                {% set max_speed = states('number.brizer_bedroom_max_fan_speed')|int(none) %}
+                {{ min_speed|is_number and max_speed|is_number and min_speed != max_speed }}
+              sequence:
+                - service: switch.turn_on
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+                - service: system_log.write
+                  data:
+                    message: >-
+                      brizer_bedroom_set_fan_mode: update_device auto mode on "{{ states('number.brizer_bedroom_min_fan_speed')|int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}:{{ states('number.brizer_bedroom_target_co2')|int(none) }}"
+                    level: info
+                    logger: custom_components.tion.automation
+
+
+    # Завершение выбора скорости/диапазона скоростей из интерфейса
+
+    - alias: brizer_bedroom_set_speed_n_m_finish
+      id: brizer_bedroom_set_speed_n_m_finish
+      mode: queued
+      trigger:
+        - platform: event
+          event_type: timer.finished
+          event_data:
+            entity_id: timer.brizer_bedroom_set_speed_n_m
+      action:
+        - service: input_boolean.turn_off
+          entity_id: input_boolean.brizer_bedroom_set_speed_n_m
+
+        - service: number.set_value
+          data:
+            entity_id: number.brizer_bedroom_min_fan_speed
+            value: >
+              {% if   is_state('input_boolean.brizer_bedroom_speed0','on') %}
+                0
+              {% elif is_state('input_boolean.brizer_bedroom_speed1','on') %}
+                1
+              {% elif is_state('input_boolean.brizer_bedroom_speed2','on') %}
+                2
+              {% elif is_state('input_boolean.brizer_bedroom_speed3','on') %}
+                3
+              {% elif is_state('input_boolean.brizer_bedroom_speed4','on') %}
+                4
+              {% elif is_state('input_boolean.brizer_bedroom_speed5','on') %}
+                5
+              {% elif is_state('input_boolean.brizer_bedroom_speed6','on') %}
+                6
+              {% else %}
+                0
+              {% endif %}
+                                              
+        - service: number.set_value
+          data:
+            entity_id: number.brizer_bedroom_max_fan_speed
+            value: >
+              {% if   is_state('input_boolean.brizer_bedroom_speed6','on') %}
+                6
+              {% elif is_state('input_boolean.brizer_bedroom_speed5','on') %}
+                5
+              {% elif is_state('input_boolean.brizer_bedroom_speed4','on') %}
+                4
+              {% elif is_state('input_boolean.brizer_bedroom_speed3','on') %}
+                3
+              {% elif is_state('input_boolean.brizer_bedroom_speed2','on') %}
+                2
+              {% elif is_state('input_boolean.brizer_bedroom_speed1','on') %}
+                1
+              {% else %}
+                0
+              {% endif %}
+
+
+  script:
+
+    # Скрипт on_tap для запуска установки диапазона скоростей бризера из интерфейса
+    
+    brizer_bedroom_set_speed_n_m:
+      mode: queued
+      sequence:
+        - choose:
+            # Действия для установки первой скорости
+            - conditions:
+                - condition: template
+                  value_template: "{{ is_state('input_boolean.brizer_bedroom_set_speed_n_m','off') }}"
+              sequence:
+                - service: input_boolean.turn_off
+                  entity_id: 
+                    - input_boolean.brizer_bedroom_speed0
+                    - input_boolean.brizer_bedroom_speed1
+                    - input_boolean.brizer_bedroom_speed2
+                    - input_boolean.brizer_bedroom_speed3
+                    - input_boolean.brizer_bedroom_speed4
+                    - input_boolean.brizer_bedroom_speed5
+                    - input_boolean.brizer_bedroom_speed6
+
+                - service: input_boolean.turn_on
+                  data_template:
+                    entity_id: '{{ entity_id }}'
+
+                - service: input_boolean.turn_on
+                  data_template:
+                    entity_id: input_boolean.brizer_bedroom_set_speed_n_m
+                    
+                - service: timer.start
+                  data_template:
+                    entity_id: timer.brizer_bedroom_set_speed_n_m
+
+            # Действия для установки второй скорости
+            - conditions:
+                - condition: template
+                  value_template: "{{ is_state('input_boolean.brizer_bedroom_set_speed_n_m','on') }}"
+              sequence:
+                - service: input_boolean.turn_off
+                  data_template:
+                    entity_id: input_boolean.brizer_bedroom_set_speed_n_m
+
+                - service: input_boolean.turn_on
+                  data_template:
+                    entity_id: '{{ entity_id }}'
+                    
+                - service: timer.finish
+                  data_template:
+                    entity_id: timer.brizer_bedroom_set_speed_n_m
+

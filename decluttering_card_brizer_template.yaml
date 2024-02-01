@@ -1,0 +1,286 @@
+# Новый шаблон карточки бризера
+
+brizer_template_esphome:
+  default:
+    - brizer_name: brizer_name
+    - title: "Название бризера"
+    - graph1_co2_enable: true
+    - graph1_co2_sensor: sensor.room_name_co2
+    - graph1_co2_name: "Сенсор 1"
+    - graph1_co2_color: "#00c853"
+    - graph2_co2_enable: false
+    - graph2_co2_sensor: sensor.room_name_co2
+    - graph2_co2_name: "Сенсор 2"
+    - graph2_co2_color: "#ff80ab"
+  card:
+    type: entities
+    title: "[[title]]"
+    show_header_toggle: false
+    card_mod:
+      style: "[[style]]"
+    entities:
+      - type: custom:bar-card
+        entity: sensor.[[brizer_name]]_fan_speed
+        name: "Бризер"
+        icon: mdi:air-filter
+        entity_row: true
+        min: 0
+        max: 6
+        width: 60%
+        height: 30px
+        color: grey
+        positions:
+          name: outside
+          value: inside
+        animation:
+          state: 'on'
+        severity:
+          - from: 0
+            to: 0
+            color: grey
+          - from: 1
+            to: 1
+            color: green
+          - from: 2
+            to: 2
+            color: green
+          - from: 3
+            to: 3
+            color: orange
+          - from: 4
+            to: 4
+            color: orange
+          - from: 5
+            to: 5
+            color: red
+          - from: 6
+            to: 6
+            color: red
+        card_mod:
+          style: |
+            ha-card {
+              border: none;
+              border-width: 0px;
+            }
+            bar-card-value {
+              margin-right: 16px;
+              font-weight: bold;
+            }
+
+      - type: custom:slider-entity-row
+        entity: number.[[brizer_name]]_target_co2
+        name: "Целевой уровень"
+        hide_state: false
+
+      - type: custom:multiple-entity-row
+        entity: sensor.[[brizer_name]]_status
+        name: "Скорость"
+        show_state: false
+        entities:
+          - icon: mdi:numeric-0-box-outline
+            entity: input_boolean.[[brizer_name]]_speed0
+            name: false
+            styles:
+              margin-left: 0px
+              margin-right: 2px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed0
+          - icon: mdi:numeric-1-box-outline
+            entity: input_boolean.[[brizer_name]]_speed1
+            name: false
+            styles:
+              margin-left: 2px
+              margin-right: 2px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed1
+          - icon: mdi:numeric-2-box-outline
+            entity: input_boolean.[[brizer_name]]_speed2
+            name: false
+            styles:
+              margin-left: 2px
+              margin-right: 2px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed2
+          - icon: mdi:numeric-3-box-outline
+            entity: input_boolean.[[brizer_name]]_speed3
+            name: false
+            styles:
+              margin-left: 2px
+              margin-right: 2px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed3
+          - icon: mdi:numeric-4-box-outline
+            entity: input_boolean.[[brizer_name]]_speed4
+            name: false
+            styles:
+              margin-left: 2px
+              margin-right: 2px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed4
+          - icon: mdi:numeric-5-box-outline
+            entity: input_boolean.[[brizer_name]]_speed5
+            name: false
+            styles:
+              margin-left: 2px
+              margin-right: 2px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed5
+          - icon: mdi:numeric-6-box-outline
+            entity: input_boolean.[[brizer_name]]_speed6
+            name: false
+            styles:
+              margin-left: 2px
+              margin-right: 0px
+            state_color: true
+            tap_action:
+              action: call-service
+              service: script.[[brizer_name]]_set_speed_n_m
+              service_data:
+                entity_id: input_boolean.[[brizer_name]]_speed6
+
+      - type: conditional
+        conditions:
+          - entity: input_boolean.[[brizer_name]]_heater
+            state: 'on'
+        row:
+          type: custom:slider-entity-row
+          entity: input_number.[[brizer_name]]_heater_temperature
+          name: "Температура"
+          icon: mdi:thermometer
+          hide_state: false
+
+      - type: custom:multiple-entity-row
+        entity: climate.[[brizer_name]]
+        icon: mdi:thermostat
+        name: "Режим"
+        show_state: false
+        entities:
+          - entity: input_boolean.[[brizer_name]]_on
+            icon: mdi:power
+            name: false
+            state_color: true
+            tap_action:
+              action: toggle
+            styles:
+              --state-input_boolean-on-color: "var(--green-color)"
+              --state-input_boolean-off-color: "var(--red-color)"
+              
+          - entity: switch.[[brizer_name]]_silent_mode
+            icon: mdi:weather-night
+            name: false
+            state_color: true
+            tap_action:
+              action: toggle
+
+          - entity: input_boolean.[[brizer_name]]_heater
+            icon: mdi:fire
+            name: false
+            state_color: true
+            tap_action:
+              action: toggle
+            styles:
+              --state-input_boolean-on-color: "var(--state-climate-heat-color)"
+    
+      - type: divider
+
+      - type: custom:mini-graph-card
+        group: true
+        decimals: 0
+        hour24: true
+        points_per_hour: 1
+        hours_to_show: 72
+        lower_bound_secondary: 1
+        upper_bound_secondary: 3
+        entities:
+          - entity: "[[graph1_co2_sensor]]"
+            show_state: "[[graph1_co2_enable]]"
+            show_line: false
+            show_points: false
+            show_fill: false
+            show_legend: false
+            name: "[[graph1_co2_name]]"
+            color: "[[graph1_co2_color]]"
+          - entity: "[[graph2_co2_sensor]]"
+            show_state: "[[graph2_co2_enable]]"
+            show_line: false
+            show_points: false
+            show_fill: false
+            show_legend: false
+            name: "[[graph2_co2_name]]"
+            color: "[[graph2_co2_color]]"
+          - entity: sensor.[[brizer_name]]_fan_speed
+            name: "Скорость"
+            color: orange
+            show_state: false
+            show_line: false
+            show_fill: true
+            show_points: false
+            show_legend: false
+            y_axis: secondary
+            smoothing: false
+            aggregate_func: max
+          - entity: number.[[brizer_name]]_target_co2
+            fixed_value: true
+            color: orange
+            show_points: false
+            show_fill: false
+            show_legend: false
+            show_state: false
+          - entity: "[[graph1_co2_sensor]]"
+            show_line: "[[graph1_co2_enable]]"
+            show_points: "[[graph1_co2_enable]]"
+            show_fill: false
+            show_legend: false
+            show_state: false
+            color: "[[graph1_co2_color]]"
+          - entity: "[[graph2_co2_sensor]]"
+            show_line: "[[graph2_co2_enable]]"
+            show_points: "[[graph2_co2_enable]]"
+            show_fill: false
+            show_legend: false
+            show_state: false
+            color: "[[graph2_co2_color]]"
+        show:
+          labels: true
+          labels_secondary: true
+          legend: false
+          name: false
+          icon: false
+        color_thresholds:
+          - value: 650
+            color: "#00c853"
+          - value: 950
+            color: "#ffd600"
+          - value: 1250
+            color: "#d50000"
+        card_mod:
+          style: |
+            ha-card {
+              border: none;
+              border-radius: 0px;
+              border-width: 0px;
+            }
