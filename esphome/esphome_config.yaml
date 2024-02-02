@@ -1,11 +1,12 @@
 # Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
+
 # Раскомментируйте пакет packages/tion_enable_heat_cool.yaml
+
 # Добавьте в global substitutions подстановку ниже, замените сенсор bedroom_air_monitor_co2 
 # на имя вашего сенсора в Home Assistant с показаниями уровня CO2
-
-substitutions:
-  # id of co2 HA sensor. must be redefined in global substitutions
-  auto_co2_sensor: bedroom_air_monitor_co2
+# substitutions:
+#  # id of co2 HA sensor. must be redefined in global substitutions
+#  auto_co2_sensor: chrn_bedroom_co2
 
 #
 # Добавьте следующий раздел в конфигурацию устройства в секцию объекта climate "Main climate component configuration"
@@ -87,7 +88,7 @@ sensor:
   - platform: homeassistant
     name: "Current CO2"
     id: current_co2
-    entity_id: sensor.$auto_co2_sensor #external CO2 sensor
+    entity_id: sensor.$auto_co2_sensor # id of CO2 HA sensor
     unit_of_measurement: "ppm"
     icon: "mdi:molecule-co2"
     device_class: "carbon_dioxide"
