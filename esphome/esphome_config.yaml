@@ -1,0 +1,229 @@
+# Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
+# Раскомментируйте пакет packages/tion_enable_heat_cool.yaml
+# Добавьте в global substitutions подстановку ниже, замените сенсор bedroom_air_monitor_co2 
+# на имя вашего сенсора в Home Assistant с показаниями уровня CO2
+
+substitutions:
+  # id of co2 HA sensor. must be redefined in global substitutions
+  auto_co2_sensor: bedroom_air_monitor_co2
+
+#
+# Добавьте следующий раздел в конфигурацию устройства в секцию объекта climate "Main climate component configuration"
+#
+    on_state:
+      - lambda: |-
+          id(tion_fan_speed).publish_state( (id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0 );
+          if ( id(silent_mode).state && id(tion_climate).get_fan_speed() != 1 ) id(silent_mode).publish_state( false );
+
+  - platform: pid
+    id: pid_co2
+    internal: true
+    name: "PID CO2 Controller"
+    sensor: current_co2
+    default_target_temperature: 750
+    cool_output: output_fan_speed
+    control_parameters:
+      kp: 0.00350
+      ki: 0.00001
+      kd: 0.0
+    deadband_parameters:
+      threshold_high: 10
+      threshold_low: -10
+
+#
+# Конец раздела
+#
+
+
+
+#
+# Добавьте следующий раздел с дополнительными объектами в конфигурацию устройства
+#
+
+button:
+  - platform: template
+    name: "PID CO2 Autotune"
+    on_press:
+      - climate.pid.set_control_parameters:
+          id: pid_co2
+          kp: 0.0
+          ki: 0.0
+          kd: 0.0
+      - climate.pid.autotune: 
+          id: pid_co2
+          noiseband: 50
+          positive_output: 35%
+          negative_output: -50%
+
+output:
+  # Apply Fan Speed recommended by PID controller in Auto Mode
+  - platform: template
+    id: output_fan_speed
+    type: float
+    write_action:
+      - if:
+          condition: 
+            switch.is_on: silent_mode
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: 1
+          else:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return min(max(round(6*state), id(min_fan_speed).state), id(max_fan_speed).state);'
+
+sensor:
+  # Current Fan Speed (0-6)
+  - platform: template
+    id: tion_fan_speed
+    name: "Fan Speed"
+    icon: "mdi:fan"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    internal: false
+
+  # Current CO2 level with external CO2 sensor
+  - platform: homeassistant
+    name: "Current CO2"
+    id: current_co2
+    entity_id: sensor.$auto_co2_sensor #external CO2 sensor
+    unit_of_measurement: "ppm"
+    icon: "mdi:molecule-co2"
+    device_class: "carbon_dioxide"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    internal: false
+
+switch:
+  # Enable Auto Mode
+  - platform: template
+    name: "Auto Fan Mode"
+    id: auto_fan_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      climate.control:
+        id: pid_co2
+        mode: "COOL"
+    turn_off_action:
+      climate.control:
+        id: pid_co2
+        mode: "OFF"
+
+  # Enable Silent Mode, force Fan Speed 1 in Auto Mode
+  - platform: template
+    name: "Silent Mode"
+    id: silent_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - script.execute:
+          id: set_fan_speed
+          fan_speed: 1
+    on_turn_off:
+      - script.execute:
+          id: set_fan_speed
+          fan_speed: !lambda 'return id(min_fan_speed).state;'
+
+number:
+  # Target CO2 level in Auto Mode
+  - platform: template
+    name: "Target CO2"
+    id: target_co2
+    unit_of_measurement: "ppm"
+    icon: "mdi:molecule-co2"
+    device_class: "carbon_dioxide"
+    min_value: 400
+    max_value: 1200
+    step: 50
+    optimistic: true
+    restore_value: true
+    initial_value: 750
+    on_value:
+      - climate.control:
+          id: pid_co2
+          mode: "COOL"
+          target_temperature: !lambda 'return id(target_co2).state;'
+
+  # Minimum fan speed in Auto Mode
+  - platform: template
+    name: "Min Fan Speed"
+    id: min_fan_speed
+    min_value: 0
+    max_value: 6
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 1
+    on_value:
+      - if:
+          condition: 
+            lambda: 'return x > id(max_fan_speed).state;'
+          then:
+            - number.set:
+                id: max_fan_speed
+                value: !lambda 'return x;'
+      - if:
+          condition: 
+            lambda: 'return x > id(tion_fan_speed).state;'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return x;'
+
+  # Maximum fan speed in Auto Mode
+  - platform: template
+    name: "Max Fan Speed"
+    id: max_fan_speed
+    min_value: 0
+    max_value: 6
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 2
+    on_value:
+      - if:
+          condition: 
+            lambda: 'return x < id(min_fan_speed).state;'
+          then:
+            - number.set:
+                id: min_fan_speed
+                value: !lambda 'return x;'
+      - if:
+          condition: 
+            lambda: 'return x < id(tion_fan_speed).state;'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return x;'
+
+# Script for setting the fan speed 0-6
+# '0' - turn off the fan
+# 'HEAT_COOL' mode - restore the previous mode after turning off the fan
+#   please enable packages/tion_enable_heat_cool.yaml to work
+script:
+  id: set_fan_speed
+  parameters:
+    fan_speed: int
+  then:
+      - if:
+          condition:
+            lambda: "return fan_speed != (id(tion_climate).mode != CLIMATE_MODE_OFF ? id(tion_climate).get_fan_speed() : 0);"
+          then:
+            if:
+              condition: 
+                lambda: 'return fan_speed == 0;'
+              then:
+                climate.control:
+                  id: tion_climate
+                  mode: 'OFF'
+              else:
+                climate.control:
+                  id: tion_climate
+                  mode: 'HEAT_COOL'
+                  custom_fan_mode: !lambda 'return to_string(fan_speed);'
+
+#
+# Конец раздела
+#

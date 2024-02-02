@@ -1,4 +1,7 @@
-# Новый шаблон карточки бризера
+# Шаблон карточки бризера для decluttering_card
+
+# Добавьте этот шаблон в вашу конфигурацию ui-lovelace.yaml, например, с помощью директивы
+# decluttering_templates: !include /config/ui-lovelace/decluttering_card_brizer_template.yaml
 
 brizer_template_esphome:
   default:

@@ -5,7 +5,7 @@
 # 2. Если ее нет, то добавьте в секцию homeassistant файла /homeassistant/configuration.yaml дерективу packages с указанием каталога с пакетами
 # Например:
 # homeassistant:
-#   packages: !include_dir_merge_named includes/packages
+#   packages: !include_dir_merge_named packages
 
 # 3. Если ее нет, то добавьте секцию logger и включите отладочные сообщения для custom_components.tion
 # Например:
@@ -14,7 +14,7 @@
 #   logs:
 #     custom_components.tion: debug
     
-# 4. Выложите файл в каталог с пакетами, например /homeassistant/includes/packages
+# 4. Выложите файл в каталог с пакетами, например /homeassistant/packages
 
 # 5. Перезагрузите Home Assistant и проверьте, что все объекты описанные ниже появились в  Home Assistant
 
