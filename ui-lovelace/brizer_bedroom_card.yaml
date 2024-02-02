@@ -8,7 +8,7 @@
 type: custom:decluttering-card
 template: brizer_template_esphome
 variables:
-  - brizer_name: brizer_bedroom
+  - brizer_name: brizer_bedroom # climate.brizer_name entity
   - title: "Бризер в спальне"
   - graph1_co2_enable: true
   - graph1_co2_sensor: sensor.chrn_bedroom_co2

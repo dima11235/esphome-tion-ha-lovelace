@@ -5,7 +5,7 @@
 
 brizer_template_esphome:
   default:
-    - brizer_name: brizer_name
+    - brizer_name: brizer_name # climate.brizer_name entity
     - title: "Название бризера"
     - graph1_co2_enable: true
     - graph1_co2_sensor: sensor.room_name_co2
