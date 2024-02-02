@@ -6,7 +6,7 @@
 # на имя вашего сенсора в Home Assistant с показаниями уровня CO2
 # substitutions:
 #  # id of co2 HA sensor. must be redefined in global substitutions
-#  auto_co2_sensor: chrn_bedroom_co2
+#  auto_co2_sensor: bedroom_sensor_co2
 
 #
 # Добавьте следующий раздел в конфигурацию устройства в секцию объекта climate "Main climate component configuration"
@@ -167,7 +167,7 @@ number:
                 value: !lambda 'return x;'
       - if:
           condition: 
-            lambda: 'return x > id(tion_fan_speed).state;'
+            lambda: 'return x > ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
           then:
             - script.execute:
                 id: set_fan_speed
@@ -193,7 +193,7 @@ number:
                 value: !lambda 'return x;'
       - if:
           condition: 
-            lambda: 'return x < id(tion_fan_speed).state;'
+            lambda: 'return x < ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
           then:
             - script.execute:
                 id: set_fan_speed
@@ -210,7 +210,7 @@ script:
   then:
       - if:
           condition:
-            lambda: "return fan_speed != (id(tion_climate).mode != CLIMATE_MODE_OFF ? id(tion_climate).get_fan_speed() : 0);"
+            lambda: 'return fan_speed != (id(tion_climate).mode != CLIMATE_MODE_OFF ? id(tion_climate).get_fan_speed() : 0);'
           then:
             if:
               condition: 
