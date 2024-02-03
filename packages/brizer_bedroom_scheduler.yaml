@@ -1,0 +1,272 @@
+# Расширение пакета управления бризером Тион с интеграцией ESPHOME из интерфейса Home Assistant
+# Пакет добавляет функцию ночного режима и управление бризером по расписанию из карточки sheduler-card
+#
+# Ночной режим:
+# При включении ночного режима автоматизация начинает отслеживать состояние указанного сенсора движения в комнате.
+# В случае обнаружения движения переводит бризер в тихий режим (скорость 1) на указанное время.
+# Если все успокаивается и движения больше нет, то возобновляет работу бризера в заданном режиме.
+
+# 1. Сделайте "Поиск и замену" по файлу всех вхождений строки "brizer_bedroom" на имя вашего climate устройства бризера
+# Обратите внимание, ВСЕ вхождения brizer_bedroom необходимо заменить на новое имя вашего устройства.
+# Если устройств у вас несколько - сделайте несколько файлов, каждый со своим устройством.
+
+# 2. Укажите в переменной brizer_bedroom_motion_sensor название сенсора движения для автоматического включения тихого режима
+
+# 3. Добавьте в секцию homeassistant файла /homeassistant/configuration.yaml директиву packages с указанием каталога с пакетами
+# Пример:
+# homeassistant:
+#   packages: !include_dir_merge_named includes/packages
+
+# 4. Добавьте секцию logger в файл /homeassistant/configuration.yaml и включите отладочные сообщения для custom_components.tion
+# Пример:
+# logger:
+#   default: warning
+#   logs:
+#     custom_components.tion: debug
+
+# 5. Выложите файл или файлы в созданный каталог с пакетами HA, например /homeassistant/includes/packages
+
+# 6. Перезагрузите Home Assistant и проверьте, что все объекты описанные в файлах появились в  Home Assistant
+
+
+climate_control_brizer_bedroom_scheduler:
+
+  input_text:
+
+    # Имя сенсора движения по которому будет происходит автоматический перевод бризера в тихий режим
+    brizer_bedroom_motion_sensor:
+      initial: "binary_sensor.motion_bedroom_occupancy"
+
+  input_number:
+  
+    # Длительность тишины в ночном режиме после движения
+    brizer_bedroom_silent_duration:
+      name: "Тишина"
+      icon: mdi:weather-night
+      unit_of_measurement: "мин"
+      initial: 10
+      min: 5
+      max: 30
+      step: 1
+
+  input_boolean:
+
+    # Включение ночного режима (автоматическое включение тихого режима при движении в комнате)
+    brizer_bedroom_night_mode:
+      name: "Ночной режим"
+      icon: mdi:weather-night
+    
+  automation:
+  
+    # Автоматическое включение тихого режима при движении в комнате
+    
+    - alias: brizer_bedroom_night_mode
+      id: brizer_bedroom_night_mode
+      initial_state: true
+      trigger:
+        - platform: template
+          value_template: "{{ is_state(states('input_text.brizer_bedroom_motion_sensor'),'on') }}"
+          to: "on"
+          id: occupancy_on
+
+        - platform: template
+          value_template: "{{ is_state(states('input_text.brizer_bedroom_motion_sensor'),'off') }}"
+          for:
+            minutes: "{{ states('input_number.brizer_bedroom_silent_duration')|int(10) }}"
+          id: occupancy_off
+
+        - platform: state
+          entity_id: input_boolean.brizer_bedroom_night_mode
+          id: night_mode
+      action:
+        - service_template: >
+            {% if is_state('input_boolean.brizer_bedroom_night_mode','on') and trigger.id == 'occupancy_on' %}
+              switch.turn_on
+            {% else %}
+              switch.turn_off
+            {% endif %}
+          entity_id: switch.brizer_bedroom_silent_mode
+
+  script:
+
+    # Скрипт для установки режима бризера из sheduler-card
+    
+    brizer_bedroom_set_mode:
+      alias: brizer_bedroom_set_mode
+      description: "Устанавливает режим работы бризера"
+      mode: single
+      icon: mdi:air-filter
+      fields:
+        speed:
+          description: "Cкорость"
+          name: fan_speed
+          selector:
+            number:
+              min: 0
+              max: 6
+              step: 1
+              mode: slider
+        min_fan_speed:
+          description: "Минимальная скорость"
+          name: min_fan_speed
+          selector:
+            number:
+              min: 0
+              max: 6
+              step: 1
+              mode: slider
+        max_fan_speed:
+          description: "Максимальная скорость"
+          name: max_fan_speed
+          selector:
+            number:
+              min: 0
+              max: 6
+              step: 1
+              mode: slider
+        target_co2:
+          description: "Целевой уровень CO₂"
+          name: target_co2
+          selector:
+            number:
+              min: 400
+              max: 1200
+              step: 50
+              unit_of_measurement: "ppm"
+              mode: slider
+        night_mode:
+          name: night_mode
+          description: "Ночной режим"
+          selector:
+            boolean:
+        heater_mode:
+          name: heater_mode
+          description: "Подогрев воздуха"
+          selector:
+            boolean:
+        temperature:
+          name: temperature
+          description: "Температура подогрева воздуха"
+          selector:
+            number:
+              min: 0
+              max: 30
+              step: 1
+              unit_of_measurement: "°C"
+              mode: slider
+      sequence:
+        # Установка фиксированной скорости (ручной режим)
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ fan_speed is defined and is_number(fan_speed) }}"
+              sequence: 
+                - service: number.set_value
+                  target:
+                    entity_id: number.brizer_bedroom_min_fan_speed
+                  data:
+                    value: "{{ fan_speed }}"
+                - service: number.set_value
+                  target:
+                    entity_id: number.brizer_bedroom_max_fan_speed
+                  data:
+                    value: "{{ fan_speed }}"
+                - service: switch.turn_off
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+                - service: input_boolean.turn_off
+                  entity_id: input_boolean.brizer_bedroom_night_mode
+                - delay: 
+                    seconds: 1
+
+        # Установка ночного режима (авто режим)
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ night_mode is defined }}"
+              sequence: 
+                - service: >
+                    {% if night_mode == true or night_mode == "on"  %}
+                      input_boolean.turn_on
+                    {% elif night_mode == "toggle" %}
+                      input_boolean.toggle
+                    {% else %}
+                      input_boolean.turn_off
+                    {% endif %}                    
+                  entity_id: input_boolean.brizer_bedroom_night_mode
+                - service: switch.turn_on
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+        # Установка минимальной скорости (авто режим)
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ min_fan_speed is defined and is_number(min_fan_speed) }}"
+              sequence:
+                - service: number.set_value
+                  target:
+                    entity_id: number.brizer_bedroom_min_fan_speed
+                  data:
+                    value: "{{ min_fan_speed }}"
+                - service: switch.turn_on
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+        # Установка максимальной скорости (авто режим)
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ max_fan_speed is defined and is_number(max_fan_speed) }}"
+              sequence:
+                - service: number.set_value
+                  target:
+                    entity_id: number.brizer_bedroom_max_fan_speed
+                  data:
+                    value: "{{ max_fan_speed }}"
+                - service: switch.turn_on
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+        # Установка целевого уровня CO₂ (авто режим)
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ target_co2 is defined and is_number(target_co2) }}"
+              sequence:
+                - service: number.set_value
+                  target:
+                    entity_id: number.brizer_bedroom_target_co2
+                  data:
+                    value: "{{ target_co2 }}"
+                - service: switch.turn_on
+                  entity_id: switch.brizer_bedroom_auto_fan_mode
+
+        # Установка температуры
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ temperature is defined and is_number(temperature) }}"
+              sequence:
+                - service: input_number.set_value
+                  target:
+                    entity_id: input_number.brizer_bedroom_heater_temperature
+                  data:
+                    value: "{{ temperature }}"
+                - delay: 
+                    seconds: 1
+
+        # Установка режима подогрева воздуха
+        - choose:
+            - conditions:
+                - condition: template
+                  value_template: "{{ heater_mode is defined }}"
+              sequence:
+                - service: >
+                    {% if heater_mode == true or heater_mode == "on" %}
+                      input_boolean.turn_on
+                    {% elif heater_mode == "toggle" %}
+                      input_boolean.toggle
+                    {% else %}
+                      input_boolean.turn_off
+                    {% endif %}                    
+                  entity_id: input_boolean.brizer_bedroom_heater
+                - delay: 
+                    seconds: 1
+                    

@@ -5,6 +5,9 @@
 <p>Весь огород затеян только для того, чтобы получить карточку бризера Тион в HA следующего вида:</p>
 <p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-lovelace.jpg" />
 
+<p>Также есть возможность управлять режимом бризера Тион по расписанию с помощью scheduler-card:</p>
+<p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-scheduler-card.jpg" />
+
 <p>К моему большому сожалению, данный набор конфигураций совсем не приспособлен для какого-либо простого распространения и использования.
 И, более того, я не представляю, как его приспособить. 
 Поэтому, если соберетесь их как-то использовать, нужно будет приложить много усилий.</p>
@@ -24,6 +27,7 @@
 	<li>slider-entity-row</li>
 	<li>multiple-entity-row</li>
 	<li>mini-graph-card</li>
+	<li>scheduler-card (опционально)</li>
 </ul>
 
 <p>Описание файлов:</p>
@@ -32,6 +36,8 @@
 	<li>packages/brizer_bedroom.yaml - пакет с дополнительными сущностями и автоматизациями для HA</li>
 	<li>ui-lovelace/decluttering_card_brizer_template.yaml - шаблон карточки бризера для decluttering_card</li>
 	<li>ui-lovelace/brizer_bedroom_card.yaml - пример карточки бризера для lovelace</li>
+	<li>packages/brizer_bedroom_scheduler.yaml - дополнительный пакет для управления бризером по расписанию с помощью scheduler-card (опционально)</li>
+	<li>ui-lovelace/climate_scheduler_card.yaml - пример карточки scheduler-card с управлением расписание работы бризера (опционально)</li>
 </ul>
 
 <p>Приблизительная инструкция по применению дана в начале каждого из файлов.<p>
