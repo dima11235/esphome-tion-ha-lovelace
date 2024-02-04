@@ -27,9 +27,7 @@
       kp: 0.00350
       ki: 0.00001
       kd: 0.0
-    deadband_parameters:
-      threshold_high: 10
-      threshold_low: -10
+
 
 #
 # Конец раздела
