@@ -170,7 +170,14 @@ climate_devices_brizer_bedroom:
               sequence:
                 - choose:
                     # Включение бризера
-                    - conditions: "{{ is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','on') }}"
+                    - conditions: >
+                        {{ 
+                            is_state('climate.brizer_bedroom','off') 
+                            and
+                            is_state('switch.brizer_bedroom_auto_fan_mode','off') 
+                            and 
+                            is_state('input_boolean.brizer_bedroom_on','on') 
+                        }}
                       sequence:
                         - service: climate.turn_on
                           entity_id: climate.brizer_bedroom
@@ -200,7 +207,12 @@ climate_devices_brizer_bedroom:
                                     logger: custom_components.tion.automation
 
                     # Выключение бризера
-                    - conditions: "{{ not is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','off') }}"
+                    - conditions: >
+                        {{ 
+                            (not is_state('climate.brizer_bedroom','off') or is_state('switch.brizer_bedroom_auto_fan_mode','on'))
+                            and 
+                            is_state('input_boolean.brizer_bedroom_on','off') 
+                        }}
                       sequence:
                         # Выключение автоматического режима, чтобы он сам не включал бризер
                         - service: switch.turn_off
