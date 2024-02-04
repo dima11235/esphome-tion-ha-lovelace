@@ -1,27 +1,32 @@
 # Пакет для управления бризером Тион с интеграцией ESPHOME из интерфейса Home Assistant
 
 # 1. Сделайте "Поиск и замену" по файлу всех вхождений строки "brizer_bedroom" на имя вашего climate устройства бризера
+# Обратите внимание, ВСЕ вхождения brizer_bedroom необходимо заменить на новое имя вашего устройства.
+# Если устройств у вас несколько - сделайте несколько файлов, каждый со своим устройством.
 
-# 2. Если ее нет, то добавьте в секцию homeassistant файла /homeassistant/configuration.yaml дерективу packages с указанием каталога с пакетами
-# Например:
+# 2. Добавьте в секцию homeassistant файла /homeassistant/configuration.yaml директиву packages с указанием каталога с пакетами
+# Пример:
 # homeassistant:
-#   packages: !include_dir_merge_named packages
+#   packages: !include_dir_merge_named includes/packages
 
-# 3. Если ее нет, то добавьте секцию logger и включите отладочные сообщения для custom_components.tion
-# Например:
+# 3. Добавьте секцию logger в файл /homeassistant/configuration.yaml и включите отладочные сообщения для custom_components.tion
+# Пример:
 # logger:
 #   default: warning
 #   logs:
 #     custom_components.tion: debug
     
-# 4. Выложите файл в каталог с пакетами, например /homeassistant/packages
+# 4. Выложите файл или файлы в созданный каталог с пакетами HA, например /homeassistant/includes/packages
 
-# 5. Перезагрузите Home Assistant и проверьте, что все объекты описанные ниже появились в  Home Assistant
+# 5. Перезагрузите Home Assistant и проверьте, что все объекты описанные в файлах появились в  Home Assistant
 
 climate_devices_brizer_bedroom:
 
-    # Элементы, предоставляемые бризером для управления из интерфейса
+    # Элементы, предоставляемые бризером через ESPHOME для управления из интерфейса
   
+    # Климат уройство
+    # climate.brizer_bedroom
+    
     # Включение автоматического режима
     # switch.brizer_bedroom_auto_fan_mode
 
@@ -40,8 +45,8 @@ climate_devices_brizer_bedroom:
     # Максимальная скорость в автоматическом режиме
     # number.brizer_bedroom_max_fan_speed
   
-    # Дополнительные элементы для управления бризером из интерфейса
-    # Не предоставляются устройством напрямую и работают через автоматизации ниже
+    # Ниже дополнительные элементы для управления бризером из интерфейса
+    # Не предоставляются устройством напрямую и работают через автоматизации
   
   input_number:
   
@@ -190,7 +195,7 @@ climate_devices_brizer_bedroom:
                                 - service: system_log.write
                                   data:
                                     message: >-
-                                      brizer_bedroom_update: update_device auto mode on "{{ states('number.brizer_bedroom_min_fan_speed')|int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}:{{ states('number.brizer_bedroom_target_co2')|int(none) }}"
+                                      brizer_bedroom_update: update_device auto mode "{{ states('number.brizer_bedroom_min_fan_speed')|int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}:{{ states('number.brizer_bedroom_target_co2')|int(none) }}"
                                     level: info
                                     logger: custom_components.tion.automation
 
@@ -204,7 +209,7 @@ climate_devices_brizer_bedroom:
                         - service: system_log.write
                           data:
                             message: >-
-                              brizer_bedroom_interface_update: update_device auto mode "off"
+                              brizer_bedroom_interface_update: update_device auto mode off
                             level: info
                             logger: custom_components.tion.automation
 
@@ -214,7 +219,7 @@ climate_devices_brizer_bedroom:
                         - service: system_log.write
                           data:
                             message: >-
-                              brizer_bedroom_update: update_device "off"
+                              brizer_bedroom_update: update_device off
                             level: info
                             logger: custom_components.tion.automation
 
@@ -265,7 +270,14 @@ climate_devices_brizer_bedroom:
               sequence:
                 # Обновление значения переменной input_boolean.brizer_bedroom_on при включении/выключении бризера
                 - choose:
-                    - conditions: "{{ is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','on') }}"
+                    - conditions: >
+                        {{  
+                            is_state('climate.brizer_bedroom','off') 
+                            and
+                            is_state('switch.brizer_bedroom_auto_fan_mode','off')
+                            and 
+                            is_state('input_boolean.brizer_bedroom_on','on') 
+                        }}
                       sequence:
                         - service: input_boolean.turn_off
                           entity_id: input_boolean.brizer_bedroom_on
@@ -273,11 +285,16 @@ climate_devices_brizer_bedroom:
                         - service: system_log.write
                           data:
                             message: >-
-                              brizer_bedroom_update: update_control "off"
+                              brizer_bedroom_update: update_control off
                             level: info
                             logger: custom_components.tion.automation
 
-                    - conditions: "{{ not is_state('climate.brizer_bedroom','off') and is_state('input_boolean.brizer_bedroom_on','off') }}"
+                    - conditions: >
+                        {{ 
+                            (not is_state('climate.brizer_bedroom','off') or is_state('switch.brizer_bedroom_auto_fan_mode','on'))
+                            and
+                            is_state('input_boolean.brizer_bedroom_on','off') 
+                        }}
                       sequence:
                         - service: input_boolean.turn_on
                           entity_id: input_boolean.brizer_bedroom_on
@@ -285,7 +302,7 @@ climate_devices_brizer_bedroom:
                         - service: system_log.write
                           data:
                             message: >-
-                              brizer_bedroom_update: update_control "on"
+                              brizer_bedroom_update: update_control on
                             level: info
                             logger: custom_components.tion.automation
               
@@ -299,7 +316,7 @@ climate_devices_brizer_bedroom:
                         - service: system_log.write
                           data:
                             message: >-
-                              brizer_bedroom_update: update_control: heater "off"
+                              brizer_bedroom_update: update_control: heater off
                             level: info
                             logger: custom_components.tion.automation
 
@@ -311,7 +328,7 @@ climate_devices_brizer_bedroom:
                         - service: system_log.write
                           data:
                             message: >-
-                              brizer_bedroom_update: update_control heater "on"
+                              brizer_bedroom_update: update_control heater on
                             level: info
                             logger: custom_components.tion.automation
 
@@ -417,7 +434,7 @@ climate_devices_brizer_bedroom:
                 - service: system_log.write
                   data:
                     message: >-
-                      brizer_bedroom_set_fan_mode: update_device auto mode off "{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}"
+                      brizer_bedroom_set_fan_mode: update_device fan mode "{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}"
                     level: info
                     logger: custom_components.tion.automation
 
@@ -432,7 +449,7 @@ climate_devices_brizer_bedroom:
                 - service: system_log.write
                   data:
                     message: >-
-                      brizer_bedroom_set_fan_mode: update_device auto mode on "{{ states('number.brizer_bedroom_min_fan_speed')|int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}:{{ states('number.brizer_bedroom_target_co2')|int(none) }}"
+                      brizer_bedroom_set_fan_mode: update_device auto mode "{{ states('number.brizer_bedroom_min_fan_speed')|int(none) }}-{{ states('number.brizer_bedroom_max_fan_speed')|int(none) }}:{{ states('number.brizer_bedroom_target_co2')|int(none) }}"
                     level: info
                     logger: custom_components.tion.automation
 
@@ -545,4 +562,5 @@ climate_devices_brizer_bedroom:
                 - service: timer.finish
                   data_template:
                     entity_id: timer.brizer_bedroom_set_speed_n_m
+
 
