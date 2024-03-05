@@ -1,0 +1,366 @@
+# Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
+# Раскомментируйте пакет packages/tion_enable_heat_cool.yaml
+# Добавьте в раздел substitutions, параметр auto_mode_co2_sensor имя сенсора CO2 из Home Assistant
+# substitutions:
+#   auto_mode_co2_sensor: sensor.chrn_kitchen_co2
+
+climate:
+  - platform: pid
+    id: pid_co2
+    internal: true
+    name: "PID CO2 Controller"
+    sensor: current_co2
+    default_target_temperature: 750
+    cool_output: output_fan_speed
+    control_parameters:
+      kp: 0.002
+      ki: 0.00001
+      kd: 0.0
+
+
+output:
+  # Apply Fan Speed recommended by PID controller in Auto Mode
+  - platform: template
+    id: output_fan_speed
+    type: float
+    write_action:
+      - logger.log: "output_fan_speed: write_action"
+      - if:
+          condition:
+            and:
+              - switch.is_on: power_mode
+              - switch.is_on: auto_fan_mode
+          then:
+            - if:
+                condition:
+                  switch.is_on: silent_mode
+                then:
+                  - script.execute:
+                      id: set_fan_speed
+                      fan_speed: 1
+                else:
+                  - script.execute:
+                      id: set_fan_speed
+                      fan_speed: !lambda 'return min(max(round(6*state), id(min_fan_speed).state), id(max_fan_speed).state);'
+
+
+script:
+  # Script for setting the fan speed 0-6
+  - id: set_fan_speed
+    parameters:
+      fan_speed: int
+    then:
+        - logger.log: "set_fan_speed"
+        - if:
+            condition:
+              lambda: 'return fan_speed != (id(tion_climate).mode != CLIMATE_MODE_OFF ? id(tion_climate).get_fan_speed() : 0);'
+            then:
+              if:
+                condition: 
+                  lambda: 'return fan_speed == 0;'
+                then:
+                  climate.control:
+                    id: tion_climate
+                    mode: 'OFF'
+                else:
+                  if:
+                    condition: 
+                      switch.is_on: heater_mode
+                    then:
+                      climate.control:
+                        id: tion_climate
+                        mode: 'HEAT'
+                        custom_fan_mode: !lambda 'return to_string(fan_speed);'
+                    else:
+                      climate.control:
+                        id: tion_climate
+                        mode: 'FAN_ONLY'
+                        custom_fan_mode: !lambda 'return to_string(fan_speed);'
+
+
+button:
+  - platform: template
+    internal: true
+    name: "PID CO2 Autotune"
+    on_press:
+      - climate.pid.set_control_parameters:
+          id: pid_co2
+          kp: 0.0
+          ki: 0.0
+          kd: 0.0
+      - climate.pid.autotune: 
+          id: pid_co2
+          noiseband: 50
+          positive_output: 35%
+          negative_output: -50%
+
+
+sensor:
+  # Current Fan Speed (0-6)
+  - platform: template
+    id: fan_speed
+    name: "Fan Speed"
+    icon: "mdi:fan"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    internal: false
+    lambda: 'return (id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0;'
+    filters:
+      - delta: 1.0
+    update_interval: 1s
+    on_value:
+      - logger.log: "sensor.fan_speed: on_value"
+      - if:
+          condition: 
+            and:
+              - lambda: 'return x > 0;'
+              - switch.is_off: power_mode
+          then:
+            - switch.turn_on: power_mode
+      - if:
+          condition: 
+            and:
+              - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_HEAT);'
+              - switch.is_off: heater_mode
+          then:
+            - switch.turn_on: heater_mode
+      - if:
+          condition: 
+            and:
+              - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY);'
+              - switch.is_on: heater_mode
+          then:
+            - switch.turn_off: heater_mode
+
+
+  # Current CO2 level from external sensor in Home Assistant
+  - platform: homeassistant
+    name: "Current CO2"
+    id: current_co2
+    entity_id: ${auto_mode_co2_sensor}
+    unit_of_measurement: "ppm"
+    icon: "mdi:molecule-co2"
+    device_class: "carbon_dioxide"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    internal: false
+
+
+switch:
+  # Turn ON / OFF 
+  - platform: template
+    name: "Power Mode"
+    icon: "mdi:power"
+    id: power_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "switch.power_mode: turn_on_action"
+      - if:
+          condition: 
+            switch.is_on: heater_mode
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'HEAT'
+          else:
+            - climate.control:
+                id: tion_climate
+                mode: 'FAN_ONLY'
+      - if:
+          condition: 
+            switch.is_on: auto_fan_mode
+          then:
+            - climate.control:
+                id: pid_co2
+                mode: 'COOL'
+          else:
+            - climate.control:
+                id: pid_co2
+                mode: 'OFF'
+    turn_off_action:
+      - logger.log: "switch.power_mode: turn_off_action"
+      - climate.control:
+          id: pid_co2
+          mode: 'OFF'
+      - climate.control:
+          id: tion_climate
+          mode: 'OFF'
+
+
+  # Heater mode
+  - platform: template
+    name: "Heater Mode"
+    icon: "mdi:fire"
+    id: heater_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "switch.heater_mode: turn_on_action"
+      - if:
+          condition: 
+            lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'HEAT'
+    turn_off_action:
+      - logger.log: "switch.heater_mode: turn_off_action"
+      - if:
+          condition: 
+            lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'FAN_ONLY'
+
+
+  # Auto Mode
+  - platform: template
+    name: "Auto Fan Mode"
+    icon: "mdi:fan-auto"
+    id: auto_fan_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "switch.auto_fan_mode: turn_on_action"
+      - climate.control:
+          id: pid_co2
+          mode: 'COOL'
+    turn_off_action:
+      - logger.log: "switch.auto_fan_mode: turn_off_action"
+      - climate.control:
+          id: pid_co2
+          mode: 'OFF'
+
+
+  # Silent Mode (force Fan Speed 1 in Auto Mode)
+  - platform: template
+    name: "Silent Mode"
+    icon: "mdi:weather-night"
+    id: silent_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    on_turn_on:
+      - logger.log: "switch.silent_mode: turn_on_action"
+      - if:
+          condition: 
+            switch.is_on: power_mode
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: 1
+    on_turn_off:
+      - logger.log: "switch.silent_mode: turn_off_action"
+      - if:
+          condition: 
+            switch.is_on: power_mode
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return id(min_fan_speed).state;'
+
+
+number:
+  # Target CO2 level in Auto Mode
+  - platform: template
+    name: "Target CO2"
+    id: target_co2
+    unit_of_measurement: "ppm"
+    icon: "mdi:molecule-co2"
+    device_class: "carbon_dioxide"
+    min_value: 400
+    max_value: 1200
+    step: 50
+    lambda: 'return id(pid_co2).target_temperature;'
+    update_interval: 15s
+    set_action:
+      - logger.log: "number.target_co2: set_action"
+      - climate.control:
+          id: pid_co2
+          target_temperature: !lambda 'return x;'
+
+
+  # Heater temperature
+  - platform: template
+    name: "Heater Temperature"
+    icon: "mdi:thermometer"
+    id: heater_temperature
+    unit_of_measurement: "°C"
+    device_class: "temperature"
+    min_value: 0
+    max_value: 30
+    step: 1
+    lambda: 'return id(tion_climate).target_temperature;'
+    update_interval: 15s
+    set_action:
+      - logger.log: "number.heater_temperature: set_action"
+      - climate.control:
+          id: tion_climate
+          target_temperature: !lambda 'return x;'
+
+
+  # Minimum fan speed in Auto Mode
+  - platform: template
+    name: "Min Fan Speed"
+    icon: "mdi:fan"
+    id: min_fan_speed
+    min_value: 0
+    max_value: 6
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 1
+    on_value:
+      - logger.log: "tion_auto_mode: number.min_fan_speed: on_value"
+      - if:
+          condition: 
+            lambda: 'return x > id(max_fan_speed).state;'
+          then:
+            - number.set:
+                id: max_fan_speed
+                value: !lambda 'return x;'
+      - if:
+          condition:
+            and:
+              - switch.is_on: power_mode
+              - switch.is_on: auto_fan_mode
+              - switch.is_off: silent_mode
+              - lambda: 'return x > ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return x;'
+
+
+  # Maximum fan speed in Auto Mode
+  - platform: template
+    name: "Max Fan Speed"
+    icon: "mdi:fan"
+    id: max_fan_speed
+    min_value: 0
+    max_value: 6
+    step: 1
+    optimistic: true
+    restore_value: true
+    initial_value: 2
+    on_value:
+      - logger.log: "tion_auto_mode: number.max_fan_speed: on_value"
+      - if:
+          condition: 
+            lambda: 'return x < id(min_fan_speed).state;'
+          then:
+            - number.set:
+                id: min_fan_speed
+                value: !lambda 'return x;'
+      - if:
+          condition: 
+            and:
+              - switch.is_on: power_mode
+              - switch.is_on: auto_fan_mode
+              - switch.is_off: silent_mode
+              - lambda: 'return x < ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return x;'
