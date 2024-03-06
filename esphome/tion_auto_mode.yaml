@@ -1,7 +1,16 @@
 # Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
-# Добавьте в раздел substitutions, параметр auto_mode_co2_sensor имя сенсора CO2 из Home Assistant
+#
 # substitutions:
+#   # Добавьте данную подстановку с указанием имени сенсора CO2 в раздел substitutions
 #   auto_mode_co2_sensor: sensor.chrn_kitchen_co2
+#
+# packages:
+#   # Добавьте данный пакет в раздел packages
+#   tion_auto_mode:
+#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
+#     files:
+#       - esphome/tion_auto_mode.yaml
+#
 
 climate:
   - platform: pid
