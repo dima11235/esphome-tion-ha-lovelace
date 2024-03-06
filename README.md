@@ -14,7 +14,7 @@
 <ul>
 	<li>реализовать возможность управления бризером по расписанию с помощью Home Assistant:</li>
 </ul>
-<p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-scheduler-card.jpg" />
+<p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-scheduler-card.jpg" width=50%; />
 
 <p>К моему большому сожалению, данный набор конфигураций слабо приспособлен для простого распространения.
 Поэтому, если соберетесь их как-то использовать, нужно будет приложить много усилий.</p>
