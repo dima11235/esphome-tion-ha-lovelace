@@ -6,9 +6,9 @@
 # Про необходимость замены сущностей на те, которые присутствуют именно в вашей конфигурации, не пишу
 
 type: custom:decluttering-card
-template: brizer_template_esphome
+template: brizer_template
 variables:
-  - brizer_name: brizer_bedroom # climate.brizer_name entity
+  - brizer_name: brizer_bedroom
   - title: "Бризер в спальне"
   - graph1_co2_enable: true
   - graph1_co2_sensor: sensor.chrn_bedroom_co2
@@ -18,3 +18,4 @@ variables:
   - graph2_co2_sensor: sensor.chrn_bedroom_co2
   - graph2_co2_name: "Спальня"
   - graph2_co2_color: "#7c4dff"
+  

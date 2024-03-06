@@ -3,9 +3,9 @@
 # Добавьте этот шаблон в вашу конфигурацию ui-lovelace.yaml, например, с помощью директивы
 # decluttering_templates: !include /config/ui-lovelace/decluttering_card_brizer_template.yaml
 
-brizer_template_esphome:
+brizer_template:
   default:
-    - brizer_name: brizer_name # climate.brizer_name entity
+    - brizer_name: brizer_name
     - title: "Название бризера"
     - graph1_co2_enable: true
     - graph1_co2_sensor: sensor.room_name_co2
@@ -89,7 +89,7 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed0
           - icon: mdi:numeric-1-box-outline
@@ -101,7 +101,7 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed1
           - icon: mdi:numeric-2-box-outline
@@ -113,7 +113,7 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed2
           - icon: mdi:numeric-3-box-outline
@@ -125,7 +125,7 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed3
           - icon: mdi:numeric-4-box-outline
@@ -137,7 +137,7 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed4
           - icon: mdi:numeric-5-box-outline
@@ -149,7 +149,7 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed5
           - icon: mdi:numeric-6-box-outline
@@ -161,17 +161,17 @@ brizer_template_esphome:
             state_color: true
             tap_action:
               action: call-service
-              service: script.[[brizer_name]]_set_speed_n_m
+              service: script.[[brizer_name]]_set_speed_on_tap
               service_data:
                 entity_id: input_boolean.[[brizer_name]]_speed6
 
       - type: conditional
         conditions:
-          - entity: input_boolean.[[brizer_name]]_heater
+          - entity: switch.[[brizer_name]]_heater_mode
             state: 'on'
         row:
           type: custom:slider-entity-row
-          entity: input_number.[[brizer_name]]_heater_temperature
+          entity: number.[[brizer_name]]_heater_temperature
           name: "Температура"
           icon: mdi:thermometer
           hide_state: false
@@ -182,7 +182,7 @@ brizer_template_esphome:
         name: "Режим"
         show_state: false
         entities:
-          - entity: input_boolean.[[brizer_name]]_on
+          - entity: switch.[[brizer_name]]_power_mode
             icon: mdi:power
             name: false
             state_color: true
@@ -199,7 +199,7 @@ brizer_template_esphome:
             tap_action:
               action: toggle
 
-          - entity: input_boolean.[[brizer_name]]_heater
+          - entity: switch.[[brizer_name]]_heater_mode
             icon: mdi:fire
             name: false
             state_color: true
@@ -217,7 +217,7 @@ brizer_template_esphome:
         points_per_hour: 1
         hours_to_show: 72
         lower_bound_secondary: 1
-        upper_bound_secondary: 3
+        upper_bound_secondary: 4
         entities:
           - entity: "[[graph1_co2_sensor]]"
             show_state: "[[graph1_co2_enable]]"
@@ -247,7 +247,8 @@ brizer_template_esphome:
             smoothing: false
             aggregate_func: max
           - entity: number.[[brizer_name]]_target_co2
-            fixed_value: true
+            #fixed_value: true
+            aggregate_func: last
             color: orange
             show_points: false
             show_fill: false
