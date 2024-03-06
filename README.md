@@ -7,13 +7,13 @@
 <p>Проект затеян для того, чтобы:</p>
 <ul>
 	<li>реализовать автоматический режим управления скоростью бризера по аналогии с тем, как это сделано в приложении Tion MagicAir</li>
-	<li>реализовать возможность управления бризером по расписанию с помощью Home Assistant</li>
 	<li>получить карточку бризера Тион в Home Assistant следующего вида:</li>
 </ul>
- 
-<p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-lovelace.jpg" width=50%; />
+ <p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-lovelace.jpg" width=50%; />
 
-<p>Также есть возможность управлять режимом бризера Тион по расписанию с помощью scheduler-card:</p>
+<ul>
+	<li>реализовать возможность управления бризером по расписанию с помощью Home Assistant:</li>
+</ul>
 <p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-scheduler-card.jpg" />
 
 <p>К моему большому сожалению, данный набор конфигураций слабо приспособлен для простого распространения.
