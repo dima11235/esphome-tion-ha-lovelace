@@ -3,14 +3,6 @@
 <h1>Example of Home Assistant lovelace configuration for brizer Tion</h1>
 
 <p>Новости 2024-03-06: создан пакет для ESPHOME и логика работы автоматизаций частично перенесена в него.</p>
-<p>Добавьте данную подстановку с указанием имени сенсора CO2 в раздел substitutions</p>
-<p>auto_mode_co2_sensor: sensor.chrn_kitchen_co2</p>
-<p>Добавьте данный пакет в раздел packages</p>
-<p>tion_auto_mode:</p>
-<p>  url: https://github.com/dima11235/esphome-tion-ha-lovelace</p>
-<p>  files:</p>
-<p>    - esphome/tion_auto_mode.yaml</p>
-
 
 <p>Проект затеян для того, чтобы:</p>
 <ul>
