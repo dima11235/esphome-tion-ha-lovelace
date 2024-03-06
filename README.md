@@ -3,7 +3,7 @@
 <h1>Example of HA lovelace configuration for brizer Tion</h1>
 
 <p>Весь огород затеян только для того, чтобы получить карточку бризера Тион в HA следующего вида:</p>
-<p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-lovelace.jpg" />
+<p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-lovelace.jpg" width=50%; />
 
 <p>Также есть возможность управлять режимом бризера Тион по расписанию с помощью scheduler-card:</p>
 <p><img alt="" src="https://github.com/dima11235/esphome-tion-ha-lovelace/blob/main/images/tion-ha-scheduler-card.jpg" />
