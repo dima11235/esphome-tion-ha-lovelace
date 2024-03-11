@@ -21,9 +21,9 @@ climate:
     default_target_temperature: 750
     cool_output: output_fan_speed
     control_parameters:
-      kp: 0.00300
+      kp: 0.003
       ki: 0.000005
-      kd: 0.4
+      kd: 0.3
 
 
 output:
