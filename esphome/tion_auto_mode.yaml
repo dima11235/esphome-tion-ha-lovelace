@@ -109,6 +109,7 @@ sensor:
   - platform: template
     id: pid_output
     name: "PID CO2 Output"
+    state_class: "measurement"
     internal: false
 
   # Current Fan Speed (0-6)
