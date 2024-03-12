@@ -33,6 +33,7 @@ output:
     type: float
     write_action:
       - logger.log: "output_fan_speed: write_action"
+      - lambda: 'id(pid_output).publish_state(state);'
       - if:
           condition:
             and:
@@ -104,6 +105,12 @@ button:
 
 
 sensor:
+  # PID output sensor
+  - platform: template
+    id: pid_output
+    name: "PID CO2 Output"
+    internal: false
+
   # Current Fan Speed (0-6)
   - platform: template
     id: fan_speed
