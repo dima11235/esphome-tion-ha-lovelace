@@ -23,7 +23,7 @@ climate:
     control_parameters:
       kp: 0.004
       ki: 0.000005
-      kd: 0.1
+      kd: 0.05
 
 
 output:
