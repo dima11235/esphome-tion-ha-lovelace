@@ -22,7 +22,7 @@ climate:
     cool_output: output_fan_speed
     control_parameters:
       kp: 0.004
-      ki: 0.000003
+      ki: 0.000001
       kd: 0.05
 
 
