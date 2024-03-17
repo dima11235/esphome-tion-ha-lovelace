@@ -24,6 +24,7 @@ climate:
       kp: 0.004
       ki: 0.000005
       kd: 0.05
+      max_integral: 0.0 # Prevent pushing CO2 up if it is below target level for a long time
 
 
 output:
