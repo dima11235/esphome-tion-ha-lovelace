@@ -22,7 +22,7 @@ climate:
     cool_output: output_fan_speed
     control_parameters:
       kp: 0.004
-      ki: 0.000001
+      ki: 0.000005
       kd: 0.05
 
 
@@ -110,6 +110,36 @@ sensor:
     id: pid_output
     name: "PID CO2 Output"
     state_class: "measurement"
+    internal: false
+
+  - platform: pid
+    name: "PID Climate Result"
+    state_class: "measurement"
+    type: RESULT
+    internal: false
+
+  - platform: pid
+    name: "PID Climate Proportional"
+    state_class: "measurement"
+    type: PROPORTIONAL
+    internal: false
+
+  - platform: pid
+    name: "PID Climate Integral"
+    state_class: "measurement"
+    type: INTEGRAL
+    internal: false
+
+  - platform: pid
+    name: "PID Climate Derivative"
+    state_class: "measurement"
+    type: DERIVATIVE
+    internal: false
+
+  - platform: pid
+    name: "PID Climate Output"
+    state_class: "measurement"
+    type: COOL
     internal: false
 
   # Current Fan Speed (0-6)
