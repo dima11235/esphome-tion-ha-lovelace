@@ -27,6 +27,7 @@ climate:
       #kd: 0.5
       max_integral: 0.0 # Устраняет инерцию управления при длительном нахождении значения CO2 ниже целевого уровня
       min_integral: -0.167 # Максимальное дополнительное повышение скорости на 1 от интегральной составляющей
+      output_averaging_samples: 3
 
 output:
   # Apply Fan Speed recommended by PID controller in Auto Mode
