@@ -150,6 +150,7 @@ sensor:
 
   - platform: pid
     name: "PID Climate Output"
+    icon: "mdi:gauge"
     state_class: "measurement"
     type: COOL
     internal: false
