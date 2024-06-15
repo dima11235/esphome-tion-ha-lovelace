@@ -118,42 +118,42 @@ sensor:
     name: "PID CO2 Output"
     icon: "mdi:gauge"
     state_class: "measurement"
-    internal: false
+    internal: true
     entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Result"
     state_class: "measurement"
     type: RESULT
-    internal: false
+    internal: true
     entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Proportional"
     state_class: "measurement"
     type: PROPORTIONAL
-    internal: false
+    internal: true
     entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Integral"
     state_class: "measurement"
     type: INTEGRAL
-    internal: false
+    internal: true
     entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Derivative"
     state_class: "measurement"
     type: DERIVATIVE
-    internal: false
+    internal: true
     entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Output"
     state_class: "measurement"
     type: COOL
-    internal: false
+    internal: true
     entity_category: "diagnostic"
 
   # Current Fan Speed (0-6)
