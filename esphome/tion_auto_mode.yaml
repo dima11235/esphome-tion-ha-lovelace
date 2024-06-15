@@ -95,7 +95,6 @@ script:
 
 button:
   - platform: template
-    internal: true
     name: "PID CO2 Autotune"
     on_press:
       - climate.pid.set_control_parameters:
@@ -108,6 +107,8 @@ button:
           noiseband: 50
           positive_output: 35%
           negative_output: -50%
+    internal: true
+    entity_category: "diagnostic"
 
 
 sensor:
@@ -117,36 +118,42 @@ sensor:
     name: "PID CO2 Output"
     state_class: "measurement"
     internal: false
+    entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Result"
     state_class: "measurement"
     type: RESULT
     internal: false
+    entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Proportional"
     state_class: "measurement"
     type: PROPORTIONAL
     internal: false
+    entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Integral"
     state_class: "measurement"
     type: INTEGRAL
     internal: false
+    entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Derivative"
     state_class: "measurement"
     type: DERIVATIVE
     internal: false
+    entity_category: "diagnostic"
 
   - platform: pid
     name: "PID Climate Output"
     state_class: "measurement"
     type: COOL
     internal: false
+    entity_category: "diagnostic"
 
   # Current Fan Speed (0-6)
   - platform: template
