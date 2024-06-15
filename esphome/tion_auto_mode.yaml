@@ -116,6 +116,7 @@ sensor:
   - platform: template
     id: pid_output
     name: "PID CO2 Output"
+    icon: "mdi:gauge"
     state_class: "measurement"
     internal: false
     entity_category: "diagnostic"
@@ -150,7 +151,6 @@ sensor:
 
   - platform: pid
     name: "PID Climate Output"
-    icon: "mdi:gauge"
     state_class: "measurement"
     type: COOL
     internal: false
