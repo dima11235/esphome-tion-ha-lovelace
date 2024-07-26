@@ -68,14 +68,14 @@ script:
         - logger.log: "set_fan_speed"
         - if:
             condition:
-              lambda: 'return fan_speed != (id(tion_climate).mode != CLIMATE_MODE_OFF ? id(tion_climate).get_fan_speed() : 0);'
+              lambda: 'return fan_speed != (id(tion_api).mode != CLIMATE_MODE_OFF ? id(tion_api).get_fan_speed() : 0);'
             then:
               if:
                 condition: 
                   lambda: 'return fan_speed == 0;'
                 then:
                   climate.control:
-                    id: tion_climate
+                    id: tion_api
                     mode: 'OFF'
                 else:
                   if:
@@ -83,12 +83,12 @@ script:
                       switch.is_on: heater_mode
                     then:
                       climate.control:
-                        id: tion_climate
+                        id: tion_api
                         mode: 'HEAT'
                         custom_fan_mode: !lambda 'return to_string(fan_speed);'
                     else:
                       climate.control:
-                        id: tion_climate
+                        id: tion_api
                         mode: 'FAN_ONLY'
                         custom_fan_mode: !lambda 'return to_string(fan_speed);'
 
@@ -164,7 +164,7 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
     internal: false
-    lambda: 'return (id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0;'
+    lambda: 'return (id(tion_api).mode != CLIMATE_MODE_OFF) ? id(tion_api).get_fan_speed() : 0;'
     filters:
       - delta: 1.0
     update_interval: 1s
@@ -180,14 +180,14 @@ sensor:
       - if:
           condition: 
             and:
-              - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_HEAT);'
+              - lambda: 'return (x > 0 && id(tion_api).mode == CLIMATE_MODE_HEAT);'
               - switch.is_off: heater_mode
           then:
             - switch.turn_on: heater_mode
       - if:
           condition: 
             and:
-              - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY);'
+              - lambda: 'return (x > 0 && id(tion_api).mode == CLIMATE_MODE_FAN_ONLY);'
               - switch.is_on: heater_mode
           then:
             - switch.turn_off: heater_mode
@@ -221,11 +221,11 @@ switch:
             switch.is_on: heater_mode
           then:
             - climate.control:
-                id: tion_climate
+                id: tion_api
                 mode: 'HEAT'
           else:
             - climate.control:
-                id: tion_climate
+                id: tion_api
                 mode: 'FAN_ONLY'
       - if:
           condition: 
@@ -244,7 +244,7 @@ switch:
           id: pid_co2
           mode: 'OFF'
       - climate.control:
-          id: tion_climate
+          id: tion_api
           mode: 'OFF'
 
 
@@ -259,19 +259,19 @@ switch:
       - logger.log: "switch.heater_mode: turn_on_action"
       - if:
           condition: 
-            lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
+            lambda: 'return id(tion_api).mode != CLIMATE_MODE_OFF;'
           then:
             - climate.control:
-                id: tion_climate
+                id: tion_api
                 mode: 'HEAT'
     turn_off_action:
       - logger.log: "switch.heater_mode: turn_off_action"
       - if:
           condition: 
-            lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
+            lambda: 'return id(tion_api).mode != CLIMATE_MODE_OFF;'
           then:
             - climate.control:
-                id: tion_climate
+                id: tion_api
                 mode: 'FAN_ONLY'
 
 
@@ -351,12 +351,12 @@ number:
     min_value: 0
     max_value: 30
     step: 1
-    lambda: 'return id(tion_climate).target_temperature;'
+    lambda: 'return id(tion_api).target_temperature;'
     update_interval: 15s
     set_action:
       - logger.log: "number.heater_temperature: set_action"
       - climate.control:
-          id: tion_climate
+          id: tion_api
           target_temperature: !lambda 'return x;'
 
 
@@ -386,7 +386,7 @@ number:
               - switch.is_on: power_mode
               - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x > ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
+              - lambda: 'return x > ((id(tion_api).mode != CLIMATE_MODE_OFF) ? id(tion_api).get_fan_speed() : 0);'
           then:
             - script.execute:
                 id: set_fan_speed
@@ -419,7 +419,7 @@ number:
               - switch.is_on: power_mode
               - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x < ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
+              - lambda: 'return x < ((id(tion_api).mode != CLIMATE_MODE_OFF) ? id(tion_api).get_fan_speed() : 0);'
           then:
             - script.execute:
                 id: set_fan_speed
