@@ -68,7 +68,7 @@ script:
         - logger.log: "set_fan_speed"
         - if:
             condition:
-              lambda: 'return fan_speed != int(id(fan_speed).state);'
+              lambda: 'return fan_speed != id(fan_speed);'
             then:
               if:
                 condition: 
