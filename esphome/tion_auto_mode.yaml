@@ -68,7 +68,7 @@ script:
         - logger.log: "set_fan_speed"
         - if:
             condition:
-              lambda: 'return fan_speed != atoi(id(fan_speed).state.c_str());'
+              lambda: 'return fan_speed != id(fan_speed).state;'
             then:
               if:
                 condition: 
@@ -385,7 +385,7 @@ number:
               - switch.is_on: power_mode
               - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x > atoi(id(fan_speed).state.c_str());'
+              - lambda: 'return x > id(fan_speed).state;'
           then:
             - script.execute:
                 id: set_fan_speed
@@ -418,7 +418,7 @@ number:
               - switch.is_on: power_mode
               - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x < atoi(id(fan_speed).state.c_str());'
+              - lambda: 'return x < id(fan_speed).state;'
           then:
             - script.execute:
                 id: set_fan_speed
