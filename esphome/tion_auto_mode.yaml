@@ -68,7 +68,7 @@ script:
         - logger.log: "set_fan_speed"
         - if:
             condition:
-              lambda: 'return fan_speed != (id(tion_climate).mode != CLIMATE_MODE_OFF ? id(tion_climate).get_fan_speed() : 0);'
+              lambda: 'return fan_speed != id(fan_speed).state;'
             then:
               if:
                 condition: 
@@ -157,17 +157,16 @@ sensor:
     entity_category: "diagnostic"
 
   # Current Fan Speed (0-6)
-  - platform: template
+  - platform: tion
+    type: fan_speed
     id: fan_speed
     name: "Fan Speed"
     icon: "mdi:fan"
     state_class: "measurement"
     accuracy_decimals: 0
     internal: false
-    lambda: 'return (id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0;'
     filters:
       - delta: 1.0
-    update_interval: 1s
     on_value:
       - logger.log: "sensor.fan_speed: on_value"
       - if:
@@ -386,7 +385,7 @@ number:
               - switch.is_on: power_mode
               - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x > ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
+              - lambda: 'return x > id(fan_speed).state;'
           then:
             - script.execute:
                 id: set_fan_speed
@@ -419,7 +418,7 @@ number:
               - switch.is_on: power_mode
               - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x < ((id(tion_climate).mode != CLIMATE_MODE_OFF) ? id(tion_climate).get_fan_speed() : 0);'
+              - lambda: 'return x < id(fan_speed).state;'
           then:
             - script.execute:
                 id: set_fan_speed
