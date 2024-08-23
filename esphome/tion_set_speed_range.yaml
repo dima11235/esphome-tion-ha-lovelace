@@ -63,41 +63,41 @@ script:
 
 api:
   services:
-    - service: set_fan_speed_range
+    - service: set_fan_speed_range  # Определение нового сервиса set_fan_speed_range
       variables:
-        fan_speed: int
+        fan_speed: int  # Ожидаемый параметр скорости вентилятора
       then:
         - if:
             condition:
-              lambda: 'return fan_speed >= 0 && fan_speed <= 6;'
+              lambda: 'return fan_speed >= 0 && fan_speed <= 6;'  # Проверка, что скорость в допустимом диапазоне (0-6)
             then:
-              - globals.set:
-                  id: current_mode
-                  value: !lambda 'return fan_speed;'
               - if:
                   condition:
-                    lambda: 'return id(mode_timer) > 0;'
+                    lambda: 'return id(mode_timer) > 0;'  # Если вызов происходит во время активного таймера (повторный вызов)
                   then:
-                    - script.execute: handle_fan_speeds
                     - globals.set:
-                        id: last_mode
+                        id: current_mode
                         value: !lambda 'return fan_speed;'
+                    - script.execute: handle_fan_speeds  # Выполнение скрипта установки диапазона скоростей
                   else:
                     - globals.set:
                         id: last_mode
-                        value: !lambda 'return fan_speed;'
+                        value: !lambda 'return fan_speed;'  # Установка последнего режима при первом вызове
+                    - globals.set:
+                        id: current_mode
+                        value: !lambda 'return fan_speed;'  # Установка текущего режима
                     - globals.set:
                         id: mode_timer
-                        value: '1'
-                    - component.update: mode_timeout
+                        value: '1'  # Запуск таймера для ожидания повторного вызова
+                    - component.update: mode_timeout  # Обновление компонента таймера
 
               - logger.log:
-                  format: "Operation mode set to %d"
+                  format: "Operation mode set to %d"  # Логирование успешного вызова сервиса
                   args: [ 'fan_speed' ]
             else:
               - logger.log:
                   level: ERROR
-                  format: "Invalid mode value: %d"
+                  format: "Invalid mode value: %d"  # Логирование ошибки в случае недопустимого значения
                   args: [ 'fan_speed' ]
 
 interval:
