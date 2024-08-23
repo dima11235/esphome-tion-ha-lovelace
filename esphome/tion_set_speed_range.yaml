@@ -22,6 +22,11 @@ globals:
     restore_value: no
     initial_value: '-1'
 
+  - id: current_mode
+    type: int
+    restore_value: no
+    initial_value: '-1'
+
   - id: mode_timer
     type: int
     restore_value: no
@@ -64,11 +69,11 @@ api:
       then:
         - if:
             condition:
-              lambda: 'return mode >= 0 && mode <= 6;'
+              lambda: 'return fan_speed >= 0 && fan_speed <= 6;'
             then:
               - globals.set:
                   id: current_mode
-                  value: !lambda 'return mode;'
+                  value: !lambda 'return fan_speed;'
               - if:
                   condition:
                     lambda: 'return id(mode_timer) > 0;'
@@ -76,11 +81,11 @@ api:
                     - script.execute: handle_fan_speeds
                     - globals.set:
                         id: last_mode
-                        value: !lambda 'return mode;'
+                        value: !lambda 'return fan_speed;'
                   else:
                     - globals.set:
                         id: last_mode
-                        value: !lambda 'return mode;'
+                        value: !lambda 'return fan_speed;'
                     - globals.set:
                         id: mode_timer
                         value: '1'
@@ -88,12 +93,12 @@ api:
 
               - logger.log:
                   format: "Operation mode set to %d"
-                  args: [ 'mode' ]
+                  args: [ 'fan_speed' ]
             else:
               - logger.log:
                   level: ERROR
                   format: "Invalid mode value: %d"
-                  args: [ 'mode' ]
+                  args: [ 'fan_speed' ]
 
 interval:
   - interval: 1s
