@@ -1,0 +1,114 @@
+# Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
+# Добавляет в HA сервис установки диапазона скоростей для бризера set_fan_speed_range
+# 
+# Вызов сервиса:
+#
+# service: esphome.your_device_name_set_fan_speed_range
+# data:
+#   fan_speed: 3
+#
+# packages:
+#   # Добавьте данный пакет в раздел packages
+#   tion_auto_mode:
+#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
+#     files:
+#       - esphome/tion_auto_mode.yaml
+#       - esphome/tion_set_speed_range.yaml
+#
+
+globals:
+  - id: last_mode
+    type: int
+    restore_value: no
+    initial_value: '-1'
+
+  - id: mode_timer
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+script:
+  # Скрипт усановки диапазона скоростей
+  # Если вызывается только один раз и в течение трех секунд повторного вызова не происходит, то обе скорости устанавливаются в одно значение.
+  # Если вызвается повторно в течение трех секунд, то устанавливается диапазон скоростей, из первого и второго вызова.
+  - id: handle_fan_speeds
+    then:
+      - if:
+          condition:
+            lambda: 'return id(mode_timer) > 0;'
+          then:
+            - logger.log: "Repeated set_fan_speed_range call detected, setting range"
+            - number.set:
+                id: min_fan_speed
+                value: !lambda 'return std::min(id(last_mode), id(current_mode));'
+            - number.set:
+                id: max_fan_speed
+                value: !lambda 'return std::max(id(last_mode), id(current_mode));'
+          else:
+            - logger.log: "Single set_fan_speed_range call detected, setting fixed speed"
+            - number.set:
+                id: min_fan_speed
+                value: !lambda 'return id(current_mode);'
+            - number.set:
+                id: max_fan_speed
+                value: !lambda 'return id(current_mode);'
+      - globals.set:
+          id: mode_timer
+          value: '0'
+
+api:
+  services:
+    - service: set_fan_speed_range
+      variables:
+        fan_speed: int
+      then:
+        - if:
+            condition:
+              lambda: 'return mode >= 0 && mode <= 6;'
+            then:
+              - globals.set:
+                  id: current_mode
+                  value: !lambda 'return mode;'
+              - if:
+                  condition:
+                    lambda: 'return id(mode_timer) > 0;'
+                  then:
+                    - script.execute: handle_fan_speeds
+                    - globals.set:
+                        id: last_mode
+                        value: !lambda 'return mode;'
+                  else:
+                    - globals.set:
+                        id: last_mode
+                        value: !lambda 'return mode;'
+                    - globals.set:
+                        id: mode_timer
+                        value: '1'
+                    - component.update: mode_timeout
+
+              - logger.log:
+                  format: "Operation mode set to %d"
+                  args: [ 'mode' ]
+            else:
+              - logger.log:
+                  level: ERROR
+                  format: "Invalid mode value: %d"
+                  args: [ 'mode' ]
+
+interval:
+  - interval: 1s
+    id: mode_timeout
+    then:
+      - if:
+          condition:
+            lambda: 'return id(mode_timer) > 0;'
+          then:
+            - globals.set:
+                id: mode_timer
+                value: !lambda 'return id(mode_timer) + 1;'
+            - if:
+                condition:
+                  lambda: 'return id(mode_timer) >= 3;'
+                then:
+                  - script.execute: handle_fan_speeds
+
