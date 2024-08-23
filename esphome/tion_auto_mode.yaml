@@ -370,7 +370,6 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 1
-    force_update: true
     on_value:
       - logger.log: "tion_auto_mode: number.min_fan_speed: on_value"
       - if:
@@ -404,7 +403,6 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 2
-    force_update: true
     on_value:
       - logger.log: "tion_auto_mode: number.max_fan_speed: on_value"
       - if:
