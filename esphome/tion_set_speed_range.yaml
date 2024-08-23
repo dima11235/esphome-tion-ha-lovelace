@@ -1,7 +1,7 @@
 # Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
 # Добавляет в HA сервис установки диапазона скоростей для бризера set_fan_speed_range
-# Если вызывается только один раз и в течение трех секунд повторного вызова не происходит, то обе скорости устанавливаются в одно значение.
-# Если вызвается повторно в течение трех секунд, то устанавливается диапазон скоростей, из первого и второго вызова.
+# Если сервис вызывается только один раз и в течение трех секунд повторного вызова не происходит, то обе скорости устанавливаются в одно значение.
+# Если сервис вызвается повторно в течение трех секунд, то устанавливается диапазон скоростей, из первого и второго вызова.
 # 
 # Вызов сервиса:
 #
@@ -53,10 +53,10 @@ api:
                     # Установка значений сокростей для обновления интерфейса и установки первой скорости
                     - number.set:
                         id: min_fan_speed
-                        value: !lambda 'return id(fan_speed);'
+                        value: !lambda 'return fan_speed;'
                     - number.set:
                         id: max_fan_speed
-                        value: !lambda 'return id(fan_speed);'
+                        value: !lambda 'return fan_speed;'
 
                     # Запуск таймера для ожидания повторного вызова
                     - globals.set:
@@ -71,10 +71,10 @@ api:
                     # Установка диапазона скоростей
                     - number.set:
                         id: min_fan_speed
-                        value: !lambda 'return std::min(id(last_mode), id(fan_speed));'
+                        value: !lambda 'return std::min(id(last_mode), fan_speed);'
                     - number.set:
                         id: max_fan_speed
-                        value: !lambda 'return std::max(id(last_mode), id(fan_speed));'
+                        value: !lambda 'return std::max(id(last_mode), fan_speed);'
 
                     # Остановка таймера
                     - globals.set:
