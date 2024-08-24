@@ -332,14 +332,15 @@ number:
   - platform: template
     name: "Target CO2"
     id: target_co2
-    update_interval: 1s
     unit_of_measurement: "ppm"
     icon: "mdi:molecule-co2"
     device_class: "carbon_dioxide"
     min_value: 400
     max_value: 1200
     step: 50
-    lambda: 'return id(pid_co2).target_temperature;'
+    #update_interval: 1s
+    #lambda: 'return id(pid_co2).target_temperature;'
+    optimistic: true
     set_action:
       - logger.log: "number.target_co2: set_action"
       - climate.control:
