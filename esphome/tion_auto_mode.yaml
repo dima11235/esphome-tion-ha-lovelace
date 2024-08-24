@@ -248,30 +248,36 @@ switch:
 
 
   # Heater mode
-  - platform: template
+  - platform: heater
     name: "Heater Mode"
     icon: "mdi:fire"
     id: heater_mode
-    optimistic: true
-    restore_mode: RESTORE_DEFAULT_OFF
-    turn_on_action:
-      - logger.log: "switch.heater_mode: turn_on_action"
-      - if:
-          condition: 
-            lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
-          then:
-            - climate.control:
-                id: tion_climate
-                mode: 'HEAT'
-    turn_off_action:
-      - logger.log: "switch.heater_mode: turn_off_action"
-      - if:
-          condition: 
-            lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
-          then:
-            - climate.control:
-                id: tion_climate
-                mode: 'FAN_ONLY'
+
+  # Heater mode
+  #- platform: template
+  #  name: "Heater Mode"
+  #  icon: "mdi:fire"
+  #  id: heater_mode
+  #  optimistic: true
+  #  restore_mode: RESTORE_DEFAULT_OFF
+  #  turn_on_action:
+  #    - logger.log: "switch.heater_mode: turn_on_action"
+  #    - if:
+  #        condition: 
+  #          lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
+  #        then:
+  #          - climate.control:
+  #              id: tion_climate
+  #              mode: 'HEAT'
+  #  turn_off_action:
+  #    - logger.log: "switch.heater_mode: turn_off_action"
+  #    - if:
+  #        condition: 
+  #          lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
+  #        then:
+  #          - climate.control:
+  #              id: tion_climate
+  #              mode: 'FAN_ONLY'
 
 
   # Auto Mode
