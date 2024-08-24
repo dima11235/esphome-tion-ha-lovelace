@@ -442,7 +442,7 @@ interval:
           then:
             - if:
                 condition: 
-                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL);' 
+                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;' 
                 then:
                   - climate.control:
                       id: pid_co2
@@ -451,7 +451,7 @@ interval:
           else:
             - if:
                 condition: 
-                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF);' 
+                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;' 
                 then:
                   - climate.control:
                       id: pid_co2
