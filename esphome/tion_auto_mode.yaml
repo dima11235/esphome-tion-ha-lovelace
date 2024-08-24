@@ -341,6 +341,7 @@ number:
     #update_interval: 1s
     #lambda: 'return id(pid_co2).target_temperature;'
     optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
     set_action:
       - logger.log: "number.target_co2: set_action"
       - climate.control:
