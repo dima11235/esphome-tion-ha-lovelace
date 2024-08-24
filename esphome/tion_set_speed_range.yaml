@@ -64,7 +64,7 @@ api:
                     - globals.set:
                         id: mode_timer
                         value: '1'  
-                    #- component.update: mode_timeout
+                    - component.update: mode_timeout
 
                   else:
                     # Если вызов второй
@@ -82,15 +82,15 @@ api:
                     - globals.set:
                         id: mode_timer
                         value: '0'
-                    #- component.update: mode_timeout
+                    - component.update: mode_timeout
 
               - logger.log:
-                  format: "Operation mode set to %d"  # Логирование успешного вызова сервиса
+                  format: "Fan speed set to %d"  # Логирование успешного вызова сервиса
                   args: [ 'fan_speed' ]
             else:
               - logger.log:
                   level: ERROR
-                  format: "Invalid mode value: %d"  # Логирование ошибки в случае недопустимого значения
+                  format: "Invalid fan speed value: %d"  # Логирование ошибки в случае недопустимого значения
                   args: [ 'fan_speed' ]
 
 interval:
@@ -104,9 +104,6 @@ interval:
             - globals.set:
                 id: mode_timer
                 value: !lambda 'return id(mode_timer) + 1;'
-            - logger.log:
-                format: "mode_time set to %d"
-                args: [ 'id(mode_timer)' ]
             - if:
                 condition:
                   lambda: 'return id(mode_timer) >= 4;'
@@ -115,4 +112,6 @@ interval:
                   - globals.set:
                       id: mode_timer
                       value: '0'
-
+            - logger.log:
+                format: "Timer set to %d"
+                args: [ 'id(mode_timer)' ]
