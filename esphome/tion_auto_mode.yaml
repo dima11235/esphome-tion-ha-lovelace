@@ -377,7 +377,7 @@ number:
     restore_value: true
     initial_value: 1
     set_action:
-      - logger.log: "tion_auto_mode: number.min_fan_speed: on_value"
+      - logger.log: "tion_auto_mode: number.min_fan_speed: set_action"
       - if:
           condition: 
             lambda: 'return x > id(max_fan_speed).state;'
@@ -410,7 +410,7 @@ number:
     restore_value: true
     initial_value: 2
     set_action:
-      - logger.log: "tion_auto_mode: number.max_fan_speed: on_value"
+      - logger.log: "tion_auto_mode: number.max_fan_speed: set_action"
       - if:
           condition: 
             lambda: 'return x < id(min_fan_speed).state;'
