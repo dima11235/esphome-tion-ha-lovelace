@@ -64,7 +64,7 @@ api:
                     - globals.set:
                         id: mode_timer
                         value: '1'  
-                    - component.update: mode_timeout
+                    #- component.update: mode_timeout
 
                   else:
                     # Если вызов второй
@@ -82,7 +82,7 @@ api:
                     - globals.set:
                         id: mode_timer
                         value: '0'
-                    - component.update: mode_timeout
+                    #- component.update: mode_timeout
 
               - logger.log:
                   format: "Operation mode set to %d"  # Логирование успешного вызова сервиса
@@ -94,7 +94,7 @@ api:
                   args: [ 'fan_speed' ]
 
 interval:
-  - interval: 3s
+  - interval: 1s
     id: mode_timeout
     then:
       - if:
@@ -109,7 +109,7 @@ interval:
                 args: [ 'id(mode_timer)' ]
             - if:
                 condition:
-                  lambda: 'return id(mode_timer) >= 3;'
+                  lambda: 'return id(mode_timer) >= 4;'
                 then:
                   # Остановка таймера
                   - globals.set:
