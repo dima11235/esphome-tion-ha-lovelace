@@ -442,7 +442,6 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
-      - delay: 2s
       - if:
           condition: 
             lambda: 'return x != id(min_fan_speed).state;'
