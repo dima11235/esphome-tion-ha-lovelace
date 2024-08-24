@@ -342,6 +342,7 @@ number:
           id: tion_climate
           target_temperature: !lambda 'return x;'
 
+
   # Target CO2 level in Auto Mode
   - platform: template
     name: "Target CO2"
