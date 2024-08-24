@@ -332,8 +332,7 @@ number:
   - platform: template
     name: "Target CO2"
     id: target_co2
-    optimistic: true
-    update_interval: 15s
+    update_interval: 1s
     unit_of_measurement: "ppm"
     icon: "mdi:molecule-co2"
     device_class: "carbon_dioxide"
