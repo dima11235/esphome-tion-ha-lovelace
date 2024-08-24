@@ -24,12 +24,8 @@ climate:
       ki: 0.00001
       kd: 0.0
       max_integral: 0.0 # Устраняет инерцию управления при длительном нахождении значения CO2 ниже целевого уровня
-      # Вариант 1
       kp: 0.005 # Переход на следующую скорость при повышении уровня CO2 на 25 ppm
       min_integral: -0.167 # Максимальное дополнительное повышение скорости на 1 от интегральной составляющей
-      # Вариант 2
-      #kp: 0.0025 # Переход на следующую скорость при повышении уровня CO2 на 50 ppm
-      #min_integral: -0.333 # Максимальное дополнительное повышение скорости на 2 от интегральной составляющей
       output_averaging_samples: 3
 
 output:
@@ -326,30 +322,6 @@ switch:
                 id: set_fan_speed
                 fan_speed: !lambda 'return id(min_fan_speed).state;'
 
-
-number:
-  # Target CO2 level in Auto Mode
-  - platform: template
-    name: "Target CO2"
-    id: target_co2
-    unit_of_measurement: "ppm"
-    icon: "mdi:molecule-co2"
-    device_class: "carbon_dioxide"
-    min_value: 400
-    max_value: 1200
-    step: 50
-    #update_interval: 1s
-    #lambda: 'return id(pid_co2).target_temperature;'
-    optimistic: true
-    restore_value: true
-    initial_value: 750
-    set_action:
-      - logger.log: "number.target_co2: set_action"
-      - climate.control:
-          id: pid_co2
-          target_temperature: !lambda 'return x;'
-
-
   # Heater temperature
   - platform: template
     name: "Heater Temperature"
@@ -368,6 +340,30 @@ number:
           id: tion_climate
           target_temperature: !lambda 'return x;'
 
+number:
+  # Target CO2 level in Auto Mode
+  - platform: template
+    name: "Target CO2"
+    id: target_co2
+    unit_of_measurement: "ppm"
+    icon: "mdi:molecule-co2"
+    device_class: "carbon_dioxide"
+    min_value: 400
+    max_value: 1200
+    step: 50
+    optimistic: true
+    restore_value: true
+    initial_value: 750
+    set_action:
+      - logger.log: "tion_auto_mode: number.target_co2: set_action"
+      - if:
+          condition: 
+            lambda: 'return x != id(pid_co2).target_temperature;'
+          then:
+            - climate.control:
+                id: pid_co2
+                target_temperature: !lambda 'return x;'
+
 
   # Minimum fan speed in Auto Mode
   - platform: template
@@ -380,7 +376,7 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 1
-    on_value:
+    set_action:
       - logger.log: "tion_auto_mode: number.min_fan_speed: on_value"
       - if:
           condition: 
@@ -413,7 +409,7 @@ number:
     optimistic: true
     restore_value: true
     initial_value: 2
-    on_value:
+    set_action:
       - logger.log: "tion_auto_mode: number.max_fan_speed: on_value"
       - if:
           condition: 
