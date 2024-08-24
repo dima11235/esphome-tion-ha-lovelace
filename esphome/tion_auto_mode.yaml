@@ -398,9 +398,17 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
-      - climate.control:
-          id: pid_co2
-          mode: !lambda 'return (x != id(max_fan_speed).state*1)? "COOL" : "OFF";'
+      - if:
+          condition: 
+            lambda: 'return x != id(max_fan_speed).state;'
+          then:
+            - climate.control:
+                id: pid_co2
+                mode: 'COOL'
+          else:
+            - climate.control:
+                id: pid_co2
+                mode: 'OFF'
 
 
   # Maximum fan speed in Auto Mode
@@ -435,7 +443,15 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
       - delay: 2s
-      - climate.control:
-          id: pid_co2
-          mode: !lambda 'return (x != id(min_fan_speed).state*1)? "COOL" : "OFF";'
+      - if:
+          condition: 
+            lambda: 'return x != id(min_fan_speed).state;'
+          then:
+            - climate.control:
+                id: pid_co2
+                mode: 'COOL'
+          else:
+            - climate.control:
+                id: pid_co2
+                mode: 'OFF'
 
