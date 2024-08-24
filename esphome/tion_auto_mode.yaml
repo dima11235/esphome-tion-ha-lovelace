@@ -322,6 +322,8 @@ switch:
                 id: set_fan_speed
                 fan_speed: !lambda 'return id(min_fan_speed).state;'
 
+number:
+
   # Heater temperature
   - platform: template
     name: "Heater Temperature"
@@ -340,7 +342,6 @@ switch:
           id: tion_climate
           target_temperature: !lambda 'return x;'
 
-number:
   # Target CO2 level in Auto Mode
   - platform: template
     name: "Target CO2"
