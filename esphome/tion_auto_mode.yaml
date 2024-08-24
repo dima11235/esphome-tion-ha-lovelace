@@ -248,7 +248,8 @@ switch:
 
 
   # Heater mode
-  - platform: heater
+  - platform: tion
+    type: heater
     name: "Heater Mode"
     icon: "mdi:fire"
     id: heater_mode
