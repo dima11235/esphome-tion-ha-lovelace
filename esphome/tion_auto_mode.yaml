@@ -107,50 +107,6 @@ button:
 
 
 sensor:
-  # PID output sensor
-  - platform: template
-    id: pid_output
-    name: "PID CO2 Output"
-    icon: "mdi:gauge"
-    state_class: "measurement"
-    internal: true
-    entity_category: "diagnostic"
-
-  - platform: pid
-    name: "PID Climate Result"
-    state_class: "measurement"
-    type: RESULT
-    internal: true
-    entity_category: "diagnostic"
-
-  - platform: pid
-    name: "PID Climate Proportional"
-    state_class: "measurement"
-    type: PROPORTIONAL
-    internal: true
-    entity_category: "diagnostic"
-
-  - platform: pid
-    name: "PID Climate Integral"
-    state_class: "measurement"
-    type: INTEGRAL
-    internal: true
-    entity_category: "diagnostic"
-
-  - platform: pid
-    name: "PID Climate Derivative"
-    state_class: "measurement"
-    type: DERIVATIVE
-    internal: true
-    entity_category: "diagnostic"
-
-  - platform: pid
-    name: "PID Climate Output"
-    state_class: "measurement"
-    type: COOL
-    internal: true
-    entity_category: "diagnostic"
-
   # Current Fan Speed (0-6)
   - platform: tion
     type: fan_speed
@@ -274,8 +230,8 @@ switch:
                 id: set_fan_speed
                 fan_speed: !lambda 'return id(min_fan_speed).state;'
 
-number:
 
+number:
   # Heater temperature
   - platform: template
     name: "Heater Temperature"
@@ -381,8 +337,8 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
 
-interval:
 
+interval:
   # Switch auto mode based on speed limits
   - interval: 15s
     then:
