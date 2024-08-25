@@ -191,6 +191,20 @@ switch:
     name: "Heater Mode"
     icon: "mdi:fire"
     id: heater_mode
+    on_turn_on:
+      - logger.log: "switch.heater_mode: turn_on_action"
+      - if:
+          condition:
+            switch.is_off: power_mode
+          then:
+            - switch.turn_on: power_mode
+    on_turn_off:
+      - logger.log: "switch.heater_mode: turn_off_action"
+      - if:
+          condition:
+            switch.is_off: power_mode
+          then:
+            - switch.turn_on: power_mode
 
   # Silent mode (force Fan Speed 1 in Auto Mode)
   - platform: template
