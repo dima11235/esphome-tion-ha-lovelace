@@ -153,10 +153,12 @@ switch:
             climate.control:
               id: tion_climate
               mode: 'HEAT'
+              custom_fan_mode: !lambda 'return max(1, int(id(current_fan_speed).state));'
           else:
             climate.control:
               id: tion_climate
               mode: 'FAN_ONLY'
+              custom_fan_mode: !lambda 'return max(1, int(id(current_fan_speed).state));'
       - if:
           condition: 
             lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
