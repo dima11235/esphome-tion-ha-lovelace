@@ -171,20 +171,20 @@ sensor:
               - switch.is_off: power_mode
           then:
             - switch.turn_on: power_mode
-      - if:
-          condition: 
-            and:
-              - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_HEAT);'
-              - switch.is_off: heater_mode
-          then:
-            - switch.turn_on: heater_mode
-      - if:
-          condition: 
-            and:
-              - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY);'
-              - switch.is_on: heater_mode
-          then:
-            - switch.turn_off: heater_mode
+      #- if:
+      #    condition: 
+      #      and:
+      #        - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_HEAT);'
+      #        - switch.is_off: heater_mode
+      #    then:
+      #      - switch.turn_on: heater_mode
+      #- if:
+      #    condition: 
+      #      and:
+      #        - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY);'
+      #        - switch.is_on: heater_mode
+      #    then:
+      #      - switch.turn_off: heater_mode
 
 
   # Current CO2 level from external sensor in Home Assistant
