@@ -349,11 +349,12 @@ interval:
             - logger.log:
                 format: "tion_auto_mode: sync state: syncing [%d]"
                 args: [ 'id(sync_timer)' ]
-            # Установка автоматического режима
+            # Включение/отклучение регулятора автоматического режима
             - if:
                 condition: 
-                  lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;' # Включение регулятора автоматического режима
+                  lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;' 
                 then:
+                  # Включение регулятора
                   - if:
                       condition: 
                         and:
@@ -365,7 +366,7 @@ interval:
                             mode: 'COOL'
                         - logger.log: "tion_auto_mode: sync state: turn PID on"
                 else:
-                  # Отключение регулятора автоматического режима
+                  # Отключение регулятора
                   - if:
                       condition: 
                         or:
@@ -390,7 +391,7 @@ interval:
                 condition: 
                   and:
                     - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;' 
-                    - lambda: 'return id(tion_climate).target_temperature != id(heater_temperature);' 
+                    - lambda: 'return id(tion_climate).target_temperature != id(heater_temperature).state;' 
                 then:
                   - logger.log: "tion_auto_mode: sync state: set heater_temperature"
                   - number.set:
