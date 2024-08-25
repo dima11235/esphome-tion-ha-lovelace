@@ -389,7 +389,6 @@ number:
           condition:
             and:
               - switch.is_on: power_mode
-              - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
               - lambda: 'return x > int(id(current_fan_speed).state);'
           then:
@@ -421,7 +420,6 @@ number:
           condition: 
             and:
               - switch.is_on: power_mode
-              - switch.is_on: auto_fan_mode
               - switch.is_off: silent_mode
               - lambda: 'return x < int(id(current_fan_speed).state);'
           then:
