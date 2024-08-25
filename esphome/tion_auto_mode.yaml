@@ -224,14 +224,18 @@ number:
     initial_value: 20
     set_action:
       - logger.log: "number.heater_temperature: set_action"
-      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
-      - globals.set:
-          id: sync_timer
-          value: '0'
-      # Установка температуры
-      - climate.control:
-          id: tion_climate
-          target_temperature: !lambda 'return x;'
+      - if:
+          condition: 
+            lambda: 'return x != id(tion_climate).target_temperature;'
+          then:
+            # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+            - globals.set:
+                id: sync_timer
+                value: '0'
+            # Установка температуры
+            - climate.control:
+                id: tion_climate
+                target_temperature: !lambda 'return x;'
 
   # Target CO2 level in Auto Mode
   - platform: template
