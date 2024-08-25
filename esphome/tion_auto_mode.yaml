@@ -191,7 +191,7 @@ switch:
     name: "Heater Mode"
     icon: "mdi:fire"
     id: heater_mode
-    turn_on_action:
+    on_turn_on:
       - logger.log: "switch.heater_mode: turn_on_action"
       # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
       - globals.set: 
@@ -201,7 +201,7 @@ switch:
       # Включение бризера, если был выключен, нужный режим установится при включении
       - switch.turn_on: power_mode
 
-    turn_off_action:
+    on_turn_off:
       - logger.log: "switch.heater_mode: turn_off_action"
       # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
       - globals.set: 
