@@ -351,7 +351,7 @@ interval:
           value: !lambda 'return id(sync_timer) + 1;'
       - if:
           condition:
-            lambda: 'return id(sync_timer) >= 2;' #Задержка 15 сек на выполнение операций после выполнения команды из интерфейса
+            lambda: 'return id(sync_timer) < 2;' #Задержка 15 сек на выполнение операций после выполнения команды из интерфейса
           then:
             - logger.log:
                 format: "tion_auto_mode: sync state: skipping [%d]"
