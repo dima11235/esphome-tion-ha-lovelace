@@ -69,8 +69,6 @@ script:
               - globals.set:
                   id: sync_timer
                   value: '0'
-              - component.update: sync_state
-
               # Выполнение команды
               - if:
                   condition: 
@@ -107,8 +105,6 @@ sensor:
     internal: false
     filters:
       - delta: 1.0
-
-
             
   # Current CO2 level from external sensor in Home Assistant
   - platform: homeassistant
@@ -133,10 +129,11 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - logger.log: "switch.power_mode: turn_on_action"
-      - globals.set: # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set: 
           id: sync_timer
           value: '0'
-      - component.update: sync_state
+      # Выполнение команды
       - if:
           condition: 
             lambda: 'return id(max_fan_speed).state == 0;'
@@ -147,9 +144,17 @@ switch:
             - number.set:
                 id: min_fan_speed
                 value: !lambda 'return max(1, int(id(current_fan_speed).state));'
-            - script.execute:
-                id: set_fan_speed
-                fan_speed: !lambda 'return max(1, int(id(current_fan_speed).state));'
+      - if:
+          condition: 
+            switch.is_on: heater_mode
+          then:
+            climate.control:
+              id: tion_climate
+              mode: 'HEAT'
+          else:
+            climate.control:
+              id: tion_climate
+              mode: 'FAN_ONLY'
       - if:
           condition: 
             lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
@@ -163,10 +168,11 @@ switch:
                 mode: 'OFF'
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
-      - globals.set: # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set: 
           id: sync_timer
           value: '0'
-      - component.update: sync_state
+      # Выполнение команды
       - climate.control:
           id: pid_co2
           mode: 'OFF'
@@ -332,7 +338,7 @@ globals:
 
 
 interval:
-  - interval: 15s
+  - interval: 5s
     id: sync_state
     then:
       - globals.set:
@@ -340,7 +346,7 @@ interval:
           value: !lambda 'return id(sync_timer) + 1;'
       - if:
           condition:
-            lambda: 'return id(sync_timer) <= 3;' #Задержка 15 сек на выполнение операций после выполнения команды из интерфейса
+            lambda: 'return id(sync_timer) <= 3;' #Задержка 10 сек на выполнение операций после выполнения команды из интерфейса
           then:
             - logger.log:
                 format: "tion_auto_mode: sync state: skipping [%d]"
