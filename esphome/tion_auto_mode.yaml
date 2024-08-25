@@ -361,8 +361,7 @@ interval:
                 args: [ 'id(sync_timer)' ]
             - globals.set:
                 id: sync_timer
-                value: 0
-
+                value: '0'
             # Включение/отклучение регулятора автоматического режима
             - if:
                 condition: 
