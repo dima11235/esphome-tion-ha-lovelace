@@ -40,7 +40,6 @@ output:
           condition:
             and:
               - switch.is_on: power_mode
-              - switch.is_on: auto_fan_mode
           then:
             - if:
                 condition:
