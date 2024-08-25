@@ -107,7 +107,10 @@ sensor:
     internal: false
     filters:
       - delta: 1.0
+    on_value:
+      - logger.log: "sensor.current_fan_speed: on_value"
 
+            
   # Current CO2 level from external sensor in Home Assistant
   - platform: homeassistant
     name: "Current CO2"
@@ -375,7 +378,7 @@ interval:
             - if: 
                 condition: 
                   and:
-                    - lambda: 'return id(current_fan_speed) > 0;' 
+                    - lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;' 
                     - switch.is_off: power_mode
                 then:
                   - logger.log: "tion_auto_mode: sync state: turn Power Mode on"
