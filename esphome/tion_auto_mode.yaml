@@ -95,7 +95,6 @@ script:
                           custom_fan_mode: !lambda 'return to_string(fan_speed);'
 
 
-
 sensor:
   # Current Fan Speed (0-6)
   - platform: tion
@@ -108,15 +107,6 @@ sensor:
     internal: false
     filters:
       - delta: 1.0
-    on_value:
-      - logger.log: "sensor.current_fan_speed: on_value"
-      - if:
-          condition: 
-            and:
-              - lambda: 'return x > 0;'
-              - switch.is_off: power_mode
-          then:
-            - switch.turn_on: power_mode
 
 
   # Current CO2 level from external sensor in Home Assistant
@@ -355,7 +345,6 @@ interval:
             - logger.log:
                 format: "tion_auto_mode: sync state: syncing [%d]"
                 args: [ 'id(sync_timer)' ]
-
             - if:
                 condition: 
                   lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;' # Включение регулятора автоматического режима
@@ -382,3 +371,11 @@ interval:
                             id: pid_co2
                             mode: 'OFF'
                         - logger.log: "tion_auto_mode: sync state: turn PID off"
+            - if:
+                condition: 
+                  and:
+                    - lambda: 'return id(current_fan_speed) > 0;' # Установка статуса включения бризера
+                    - switch.is_off: power_mode
+                then:
+                  - logger.log: "tion_auto_mode: sync state: turn Power Mode on"
+                  - switch.turn_on: power_mode
