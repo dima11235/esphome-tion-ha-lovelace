@@ -345,6 +345,7 @@ interval:
             - logger.log:
                 format: "tion_auto_mode: sync state: syncing [%d]"
                 args: [ 'id(sync_timer)' ]
+            # Установка автоматического режима
             - if:
                 condition: 
                   lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;' # Включение регулятора автоматического режима
@@ -371,10 +372,11 @@ interval:
                             id: pid_co2
                             mode: 'OFF'
                         - logger.log: "tion_auto_mode: sync state: turn PID off"
-            - if:
+            # Установка статуса включения бризера
+            - if: 
                 condition: 
                   and:
-                    - lambda: 'return id(current_fan_speed) > 0;' # Установка статуса включения бризера
+                    - lambda: 'return id(current_fan_speed) > 0;' 
                     - switch.is_off: power_mode
                 then:
                   - logger.log: "tion_auto_mode: sync state: turn Power Mode on"
