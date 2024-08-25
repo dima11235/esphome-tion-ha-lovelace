@@ -69,7 +69,7 @@ script:
               - globals.set:
                   id: sync_timer
                   value: '0'
-              - component.update: sync_timer
+              - component.update: sync_state
               # Выполнение команды
               - if:
                   condition: 
@@ -134,7 +134,7 @@ switch:
       - globals.set: 
           id: sync_timer
           value: '0'
-      - component.update: sync_timer
+      - component.update: sync_state
       # Выполнение команды
       - if:
           condition: 
@@ -174,7 +174,7 @@ switch:
       - globals.set: 
           id: sync_timer
           value: '0'
-      - component.update: sync_timer
+      - component.update: sync_state
       # Выполнение команды
       - climate.control:
           id: pid_co2
@@ -241,7 +241,7 @@ number:
             - globals.set:
                 id: sync_timer
                 value: '0'
-            - component.update: sync_timer
+            - component.update: sync_state
             # Установка температуры
             - climate.control:
                 id: tion_climate
