@@ -69,6 +69,7 @@ script:
               - globals.set:
                   id: sync_timer
                   value: '0'
+              - component.update: sync_timer
               # Выполнение команды
               - if:
                   condition: 
@@ -133,6 +134,7 @@ switch:
       - globals.set: 
           id: sync_timer
           value: '0'
+      - component.update: sync_timer
       # Выполнение команды
       - if:
           condition: 
@@ -172,6 +174,7 @@ switch:
       - globals.set: 
           id: sync_timer
           value: '0'
+      - component.update: sync_timer
       # Выполнение команды
       - climate.control:
           id: pid_co2
@@ -238,6 +241,7 @@ number:
             - globals.set:
                 id: sync_timer
                 value: '0'
+            - component.update: sync_timer
             # Установка температуры
             - climate.control:
                 id: tion_climate
@@ -338,23 +342,27 @@ globals:
 
 
 interval:
-  - interval: 5s
+  - interval: 1s
     id: sync_state
     then:
-      - globals.set:
-          id: sync_timer
-          value: !lambda 'return id(sync_timer) + 1;'
       - if:
           condition:
-            lambda: 'return id(sync_timer) <= 3;' #Задержка 10 сек на выполнение операций после выполнения команды из интерфейса
+            lambda: 'return id(sync_timer) <= 10;' #Задержка 10 сек на выполнение операций после выполнения команды из интерфейса
           then:
             - logger.log:
                 format: "tion_auto_mode: sync state: skipping [%d]"
                 args: [ 'id(sync_timer)' ]
+            - globals.set:
+                id: sync_timer
+                value: !lambda 'return id(sync_timer) + 1;'
           else:
             - logger.log:
                 format: "tion_auto_mode: sync state: syncing [%d]"
                 args: [ 'id(sync_timer)' ]
+            - globals.set:
+                id: sync_timer
+                value: 0
+
             # Включение/отклучение регулятора автоматического режима
             - if:
                 condition: 
