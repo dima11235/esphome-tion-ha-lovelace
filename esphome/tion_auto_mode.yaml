@@ -36,7 +36,6 @@ output:
     type: float
     write_action:
       - logger.log: "output_fan_speed: write_action"
-      - lambda: 'id(pid_output).publish_state(6*state);'
       - if:
           condition:
             and:
