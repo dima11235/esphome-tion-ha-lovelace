@@ -107,8 +107,7 @@ sensor:
     internal: false
     filters:
       - delta: 1.0
-    on_value:
-      - logger.log: "sensor.current_fan_speed: on_value"
+
 
             
   # Current CO2 level from external sensor in Home Assistant
@@ -220,17 +219,16 @@ number:
     min_value: 0
     max_value: 30
     step: 1
-    lambda: 'return id(tion_climate).target_temperature;'
-    update_interval: 15s
+    optimistic: true
+    restore_value: true
+    initial_value: 20
     set_action:
       - logger.log: "number.heater_temperature: set_action"
-
       # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
       - globals.set:
           id: sync_timer
           value: '0'
-      - component.update: sync_state
-
+      # Установка температуры
       - climate.control:
           id: tion_climate
           target_temperature: !lambda 'return x;'
@@ -374,7 +372,7 @@ interval:
                             id: pid_co2
                             mode: 'OFF'
                         - logger.log: "tion_auto_mode: sync state: turn PID off"
-            # Установка статуса включения бризера
+            # Чтение с бризера статуса включения
             - if: 
                 condition: 
                   and:
@@ -383,3 +381,14 @@ interval:
                 then:
                   - logger.log: "tion_auto_mode: sync state: turn Power Mode on"
                   - switch.turn_on: power_mode
+            # Чтение с бризера установленной температуры
+            - if: 
+                condition: 
+                  and:
+                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;' 
+                    - lambda: 'return id(tion_climate).target_temperature != id(heater_temperature);' 
+                then:
+                  - logger.log: "tion_auto_mode: sync state: set heater_temperature"
+                  - number.set:
+                      id: heater_temperature
+                      value: !lambda 'return id(tion_climate).target_temperature;'
