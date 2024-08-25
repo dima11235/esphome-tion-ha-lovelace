@@ -65,27 +65,35 @@ script:
             condition:
               lambda: 'return fan_speed != int(id(current_fan_speed).state);'
             then:
-              if:
-                condition: 
-                  lambda: 'return fan_speed == 0;'
-                then:
-                  climate.control:
-                    id: tion_climate
-                    mode: 'OFF'
-                else:
-                  if:
-                    condition: 
-                      switch.is_on: heater_mode
-                    then:
-                      climate.control:
-                        id: tion_climate
-                        mode: 'HEAT'
-                        custom_fan_mode: !lambda 'return to_string(fan_speed);'
-                    else:
-                      climate.control:
-                        id: tion_climate
-                        mode: 'FAN_ONLY'
-                        custom_fan_mode: !lambda 'return to_string(fan_speed);'
+              # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+              - globals.set:
+                  id: sync_timer
+                  value: '0'
+              - component.update: sync_state
+
+              # Выполнение команды
+              - if:
+                  condition: 
+                    lambda: 'return fan_speed == 0;'
+                  then:
+                    climate.control:
+                      id: tion_climate
+                      mode: 'OFF'
+                  else:
+                    if:
+                      condition: 
+                        switch.is_on: heater_mode
+                      then:
+                        climate.control:
+                          id: tion_climate
+                          mode: 'HEAT'
+                          custom_fan_mode: !lambda 'return to_string(fan_speed);'
+                      else:
+                        climate.control:
+                          id: tion_climate
+                          mode: 'FAN_ONLY'
+                          custom_fan_mode: !lambda 'return to_string(fan_speed);'
+
 
 
 sensor:
@@ -109,20 +117,6 @@ sensor:
               - switch.is_off: power_mode
           then:
             - switch.turn_on: power_mode
-      #- if:
-      #    condition: 
-      #      and:
-      #        - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_HEAT);'
-      #        - switch.is_off: heater_mode
-      #    then:
-      #      - switch.turn_on: heater_mode
-      #- if:
-      #    condition: 
-      #      and:
-      #        - lambda: 'return (x > 0 && id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY);'
-      #        - switch.is_on: heater_mode
-      #    then:
-      #      - switch.turn_off: heater_mode
 
 
   # Current CO2 level from external sensor in Home Assistant
@@ -148,6 +142,14 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - logger.log: "switch.power_mode: turn_on_action"
+
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set:
+          id: sync_timer
+          value: '0'
+      - component.update: sync_state
+
+      # Выполнение команды
       - if:
           condition: 
             switch.is_on: heater_mode
@@ -172,6 +174,13 @@ switch:
                 mode: 'OFF'
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
+      
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set:
+          id: sync_timer
+          value: '0'
+      - component.update: sync_state
+
       - climate.control:
           id: pid_co2
           mode: 'OFF'
@@ -228,10 +237,16 @@ number:
     update_interval: 15s
     set_action:
       - logger.log: "number.heater_temperature: set_action"
+
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set:
+          id: sync_timer
+          value: '0'
+      - component.update: sync_state
+
       - climate.control:
           id: tion_climate
           target_temperature: !lambda 'return x;'
-
 
   # Target CO2 level in Auto Mode
   - platform: template
@@ -318,30 +333,47 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
+         
+
+globals:
+  - id: sync_timer
+    type: int
+    restore_value: no
+    initial_value: '0'
 
 
 interval:
-  # Switch auto mode based on speed limits
   - interval: 15s
+    id: sync_state
     then:
+      - globals.set:
+          id: sync_timer
+          value: !lambda 'return id(sync_timer) + 1;'
       - if:
-          condition: 
-            lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
+          condition:
+            lambda: 'return id(sync_timer) >= 2;' #Задержка 15 сек на выполнение операций после выполнения команды из интерфейса
           then:
+            - logger.log: "tion_auto_mode: sync state: syncing"
+
             - if:
                 condition: 
-                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;' 
+                  lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;' # Включение регулятора автоматического режима
                 then:
-                  - climate.control:
-                      id: pid_co2
-                      mode: 'COOL'
-                  - logger.log: "tion_auto_mode: turn auto mode ON"
-          else:
-            - if:
-                condition: 
-                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;' 
-                then:
-                  - climate.control:
-                      id: pid_co2
-                      mode: 'OFF'
-                  - logger.log: "tion_auto_mode: turn auto mode OFF"
+                  - if:
+                      condition: 
+                        lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
+                      then:
+                        - climate.control:
+                            id: pid_co2
+                            mode: 'COOL'
+                        - logger.log: "tion_auto_mode: sync state: turn PID on"
+                else:
+                  # Отключение регулятора автоматического режима
+                  - if:
+                      condition: 
+                        lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;' 
+                      then:
+                        - climate.control:
+                            id: pid_co2
+                            mode: 'OFF'
+                        - logger.log: "tion_auto_mode: sync state: turn PID off"
