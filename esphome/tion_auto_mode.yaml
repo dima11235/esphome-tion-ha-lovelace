@@ -354,6 +354,10 @@ interval:
             lambda: 'return id(sync_timer) >= 2;' #Задержка 15 сек на выполнение операций после выполнения команды из интерфейса
           then:
             - logger.log:
+                format: "tion_auto_mode: sync state: skipping [%d]"
+                args: [ 'id(sync_timer)' ]
+          else:
+            - logger.log:
                 format: "tion_auto_mode: sync state: syncing [%d]"
                 args: [ 'id(sync_timer)' ]
 
