@@ -242,7 +242,6 @@ switch:
           id: tion_climate
           mode: 'OFF'
 
-
   # Heater mode
   - platform: tion
     type: heater
@@ -275,7 +274,6 @@ switch:
   #          - climate.control:
   #              id: tion_climate
   #              mode: 'FAN_ONLY'
-
 
   # Auto Mode
   - platform: template
