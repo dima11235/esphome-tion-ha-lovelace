@@ -201,12 +201,8 @@ switch:
       # Включение бризера, если был выключен, нужный режим установится при включении
       - if:
           condition:
-            switch.is_on: power_mode
+            switch.is_off: power_mode
           then:
-            - climate.control:
-                id: tion_climate
-                mode: 'HEAT'
-          else:
             - switch.turn_on: power_mode
     on_turn_off:
       - logger.log: "switch.heater_mode: turn_off_action"
@@ -218,12 +214,8 @@ switch:
       # Включение бризера, если был выключен, нужный режим установится при включении
       - if:
           condition:
-            switch.is_on: power_mode
+            switch.is_off: power_mode
           then:
-            - climate.control:
-                id: tion_climate
-                mode: 'FAN_ONLY'
-          else:
             - switch.turn_on: power_mode
 
   # Silent mode (force Fan Speed 1 in Auto Mode)
