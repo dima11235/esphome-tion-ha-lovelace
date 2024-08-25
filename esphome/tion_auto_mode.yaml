@@ -28,6 +28,7 @@ climate:
       min_integral: -0.167 # Максимальное дополнительное повышение скорости на 1 от интегральной составляющей
       output_averaging_samples: 3
 
+
 output:
   # Apply Fan Speed recommended by PID controller in Auto Mode
   - platform: template
@@ -86,24 +87,6 @@ script:
                         id: tion_climate
                         mode: 'FAN_ONLY'
                         custom_fan_mode: !lambda 'return to_string(fan_speed);'
-
-
-button:
-  - platform: template
-    name: "PID CO2 Autotune"
-    on_press:
-      - climate.pid.set_control_parameters:
-          id: pid_co2
-          kp: 0.0
-          ki: 0.0
-          kd: 0.0
-      - climate.pid.autotune: 
-          id: pid_co2
-          noiseband: 50
-          positive_output: 35%
-          negative_output: -50%
-    internal: true
-    entity_category: "diagnostic"
 
 
 sensor:
