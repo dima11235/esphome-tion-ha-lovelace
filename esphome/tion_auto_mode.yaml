@@ -186,11 +186,46 @@ switch:
           mode: 'OFF'
 
   # Heater mode
-  - platform: tion
-    type: heater
+  - platform: template
     name: "Heater Mode"
     icon: "mdi:fire"
     id: heater_mode
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - logger.log: "switch.heater_mode: turn_on_action"
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set: 
+          id: sync_timer
+          value: '0'
+      - component.update: sync_state
+      # Включение бризера, если был выключен, нужный режим установится при включении
+      - if:
+          condition:
+            switch.is_on: power_mode
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'HEAT'
+          else:
+            - switch.turn_on: power_mode
+    turn_off_action:
+      - logger.log: "switch.heater_mode: turn_off_action"
+      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+      - globals.set: 
+          id: sync_timer
+          value: '0'
+      - component.update: sync_state
+      # Включение бризера, если был выключен, нужный режим установится при включении
+      - if:
+          condition:
+            switch.is_on: power_mode
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'FAN_ONLY'
+          else:
+            - switch.turn_on: power_mode
 
   # Silent mode (force Fan Speed 1 in Auto Mode)
   - platform: template
