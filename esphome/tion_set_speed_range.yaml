@@ -1,13 +1,13 @@
 # Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
 #
-# Добавляет в HA сервис установки диапазона скоростей для бризера set_fan_speed_range
+# Добавляет в HA сервис установки диапазона скоростей для бризера set_fan_speed
 #   При вызове сервис устанавливает значения диапазона допустимых скоросте бризера: [min_fan_speed, max_fan_speed]
 #   Если сервис вызывается только один раз и в течение трех секунд повторного вызова не происходит, то обе скорости устанавливаются в одно значение.
 #   Если сервис вызвается повторно в течение трех секунд, то устанавливается диапазон скоростей, на базе двух последних вызовов.
 # 
 # Вызов сервиса из HA:
 #
-# service: esphome.[your_device_name]_fan_speed
+# service: esphome.[your_device_name]_set_fan_speed
 # data:
 #   fan_speed: 3
 #
@@ -17,7 +17,7 @@
 #     url: https://github.com/dima11235/esphome-tion-ha-lovelace
 #     files:
 #       - esphome/tion_auto_mode.yaml
-#       - esphome/tion_set_speed_range.yaml
+#       - esphome/tion_set_fan_speed.yaml
 #
 
 globals:
@@ -33,7 +33,7 @@ globals:
 
 api:
   services:
-    - service: fan_speed  # Определение нового сервиса fan_speed
+    - service: set_fan_speed  # Определение нового сервиса set_fan_speed
       variables:
         fan_speed: int  # Ожидаемый параметр скорости вентилятора
       then:
