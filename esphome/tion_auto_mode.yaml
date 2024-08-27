@@ -204,9 +204,13 @@ switch:
             switch.is_off: power_mode
           then:
             - switch.turn_on: power_mode
-      - climate.control:
-          id: tion_climate
-          mode: 'HEAT'
+      - if: 
+          condition: 
+            - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY;'
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'HEAT'
     turn_off_action:
       - logger.log: "switch.heater_mode: turn_off_action"
       # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
@@ -219,9 +223,13 @@ switch:
             switch.is_off: power_mode
           then:
             - switch.turn_on: power_mode
-      - climate.control:
-          id: tion_climate
-          mode: 'FAN_ONLY'
+      - if: 
+          condition: 
+            - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;' 
+          then:
+            - climate.control:
+                id: tion_climate
+                mode: 'FAN_ONLY'
 
   # Silent mode (force Fan Speed 1 in Auto Mode)
   - platform: template
@@ -438,3 +446,20 @@ interval:
                   - number.set:
                       id: heater_temperature
                       value: !lambda 'return id(tion_climate).target_temperature;'
+            # Чтение с бризера статуса нагревателя
+            - if: 
+                condition: 
+                  and:
+                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;' 
+                    - switch.is_off: heater_mode
+                then:
+                  - logger.log: "tion_auto_mode: sync state: set heater_mode on"
+                  - switch.turn_on: heater_mode
+            - if: 
+                condition: 
+                  and:
+                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY;' 
+                    - switch.is_on: heater_mode
+                then:
+                  - logger.log: "tion_auto_mode: sync state: set heater_mode on"
+                  - switch.turn_off: heater_mode
