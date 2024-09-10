@@ -104,8 +104,8 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
     internal: false
-    filters:
-      - delta: 1.0
+    #filters:
+    #  - delta: 1.0
             
   # Current CO2 level from external sensor in Home Assistant
   - platform: homeassistant
