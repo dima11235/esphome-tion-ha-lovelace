@@ -207,6 +207,9 @@ switch:
       - if: 
           condition: 
             - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY;'
+            # Переключение режима происходит только если скорость больше 0, т.к. если переключение происходит при нулевой скорости,
+            # то режим забора воздуха переключается на рециркуляцию, т.к. заслонка при нулевой скорости закрыта
+            - lambda: 'return int(id(current_fan_speed).state) > 0;'
           then:
             - climate.control:
                 id: tion_climate
@@ -226,6 +229,9 @@ switch:
       - if: 
           condition: 
             - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;' 
+            # Переключение режима происходит только если скорость больше 0, т.к. если переключение происходит при нулевой скорости,
+            # то режим забора воздуха переключается на рециркуляцию, т.к. заслонка при нулевой скорости закрыта
+            - lambda: 'return int(id(current_fan_speed).state) > 0;'
           then:
             - climate.control:
                 id: tion_climate
