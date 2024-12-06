@@ -394,7 +394,9 @@ interval:
     then:
       - if:
           condition:
-            lambda: 'return id(sync_timer) <= 10;' #Задержка 10 сек на выполнение операций после выполнения команды из интерфейса
+            # Чтение статуса бризера раз за 10 секунд
+            # После выполнения команды на бризере сбросить sync_timer в 0 для задержки выполнения операций на 10 сек
+            lambda: 'return id(sync_timer) <= 10;' 
           then:
             - globals.set:
                 id: sync_timer
