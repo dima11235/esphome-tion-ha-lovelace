@@ -266,33 +266,33 @@ switch:
 
 number:
   # Heater temperature
-  - platform: template
-    name: "Heater Temperature"
-    icon: "mdi:thermometer"
-    id: heater_temperature
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    min_value: 0
-    max_value: 30
-    step: 1
-    optimistic: true
-    restore_value: true
-    initial_value: 20
-    set_action:
-      - logger.log: "number.heater_temperature: set_action"
-      - if:
-          condition: 
-            lambda: 'return x != id(tion_climate).target_temperature;'
-          then:
-            # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
-            - globals.set:
-                id: sync_timer
-                value: '0'
-            - component.update: sync_state
-            # Установка температуры
-            - climate.control:
-                id: tion_climate
-                target_temperature: !lambda 'return x;'
+  #- platform: template
+  #  name: "Heater Temperature"
+  #  icon: "mdi:thermometer"
+  #  id: heater_temperature
+  #  unit_of_measurement: "°C"
+  #  device_class: "temperature"
+  #  min_value: 0
+  #  max_value: 30
+  #  step: 1
+  #  optimistic: true
+  #  restore_value: true
+  #  initial_value: 20
+  #  set_action:
+  #    - logger.log: "number.heater_temperature: set_action"
+  #    - if:
+  #        condition: 
+  #          lambda: 'return x != id(tion_climate).target_temperature;'
+  #        then:
+  #          # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
+  #          - globals.set:
+  #              id: sync_timer
+  #              value: '0'
+  #          - component.update: sync_state
+  #          # Установка температуры
+  #          - climate.control:
+  #              id: tion_climate
+  #              target_temperature: !lambda 'return x;'
 
   # Target CO2 level in Auto Mode
   - platform: template
