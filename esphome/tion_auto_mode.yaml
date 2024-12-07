@@ -219,12 +219,12 @@ switch:
 
 number:
   # Управление температурой подогрева воздуха
-  #- platform: tion
-  #  type: target_temperature
-  #  name: Entity Name
-  #  name: "Heater Temperature"
-  #  icon: "mdi:thermometer"
-  #  id: heater_temperature
+  - platform: tion
+    type: target_temperature
+    name: Entity Name
+    name: "Heater Temperature"
+    icon: "mdi:thermometer"
+    id: heater_temperature
 
   #- platform: template
   #  name: "Heater Temperature"
