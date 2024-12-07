@@ -165,7 +165,9 @@ switch:
           then:
             - climate.control: { id: tion_climate, mode: "HEAT" }
       - wait_until:
-          switch.is_on: heater_mode
+          condition:
+            switch.is_on: heater_mode
+          timeout: 1s
       - switch.turn_on: power_mode
     turn_off_action:
       - logger.log: "switch.heater_mode: turn_off_action"
@@ -177,7 +179,9 @@ switch:
           then:
             - climate.control: { id: tion_climate, mode: "FAN_ONLY" }
       - wait_until:
-          switch.is_off: heater_mode
+          condition:
+            switch.is_off: heater_mode
+          timeout: 1s
       - switch.turn_on: power_mode
 
   # Переключатель тихого режима (принудительная первая скорость в авто режиме)
