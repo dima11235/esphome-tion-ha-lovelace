@@ -329,7 +329,6 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
-         
 
 interval:
   - interval: 1s
@@ -337,18 +336,11 @@ interval:
     then:
       - if:
           condition:
-            # Чтение статуса бризера раз за 10 секунд
+            # Чтение статуса бризера раз в 10 секунд
             # После выполнения команды на бризере сбросить sync_timer в 0 для задержки выполнения операций на 10 сек
-            lambda: 'return id(sync_timer) <= 10;' 
+            lambda: 'return id(sync_timer)++ >= 10;' 
           then:
-            - globals.set:
-                id: sync_timer
-                value: !lambda 'return id(sync_timer) + 1;'
-          else:
-            - logger.log: "tion_auto_mode: sync state: syncing"
-            - globals.set:
-                id: sync_timer
-                value: '0'
+            - globals.set: { id: sync_timer, value: "0" }
             # Включение/отклучение регулятора автоматического режима
             - if:
                 condition: 
@@ -384,13 +376,13 @@ interval:
                     - lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;' 
                     - switch.is_off: power_mode
                 then:
-                  - logger.log: "tion_auto_mode: sync state: turn Power Mode on"
+                  - logger.log: "tion_auto_mode: sync state: turn power_mode on"
                   - switch.turn_on: power_mode
             # Чтение с бризера установленной температуры
             - if: 
                 condition: 
                   and:
-                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;' 
+                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;'
                     - lambda: 'return id(tion_climate).target_temperature != id(heater_temperature).state;' 
                 then:
                   - logger.log: "tion_auto_mode: sync state: set heater_temperature"
@@ -412,5 +404,5 @@ interval:
                     - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY;' 
                     - switch.is_on: heater_mode
                 then:
-                  - logger.log: "tion_auto_mode: sync state: set heater_mode on"
+                  - logger.log: "tion_auto_mode: sync state: set heater_mode off"
                   - switch.turn_off: heater_mode
