@@ -58,7 +58,7 @@ api:
                         id: min_fan_speed
                         value: !lambda 'return fan_speed;'
                     # Запуск таймера для ожидания повторного вызова
-                    - globals.set: { id: mode_timer, value: '1' }
+                    - globals.set: { id: mode_timer, value: "1" }
                   else:
                     - logger.log: "tion_set_fan_speed: Second set_fan_speed call detected, setting range"
                     # Установка диапазона скоростей
@@ -69,7 +69,7 @@ api:
                         id: max_fan_speed
                         value: !lambda 'return std::max(id(last_mode), fan_speed);'
                     # Остановка таймера
-                    - globals.set: { id: mode_timer, value: '0' }
+                    - globals.set: { id: mode_timer, value: "0" }
               - logger.log:
                   format: "Fan speed set to %d"  # Логирование успешного вызова сервиса
                   args: [ 'fan_speed' ]
@@ -94,9 +94,9 @@ interval:
                 condition:
                   lambda: 'return id(mode_timer) >= 4;'
                 then:
-                  - logger.log: "tion_set_fan_speed: No second set_fan_speed call, set fixed speed."
+                  - logger.log: "tion_set_fan_speed: No second set_fan_speed call, set fixed speed"
                   # Остановка таймера
-                  - globals.set: { id: mode_timer, value: '0' }
+                  - globals.set: { id: mode_timer, value: "0" }
             - logger.log:
                 format: "Timer set to %d"
                 args: [ 'id(mode_timer)' ]
