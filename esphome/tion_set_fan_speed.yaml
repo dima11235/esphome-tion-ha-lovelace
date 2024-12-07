@@ -45,31 +45,22 @@ api:
                   condition:
                     lambda: 'return id(mode_timer) == 0;' # Если вызов первый
                   then:
+                    - logger.log: "tion_set_fan_speed: First set_fan_speed call detected, setting first speed, waiting for second ..."
                     # Сохраняем режим для первого вызова
                     - globals.set:
                         id: last_mode
                         value: !lambda 'return fan_speed;'  
-                    
-                    - logger.log: "First fan_speed call detected, setting fixed speed"
-
                     # Установка значений диапазона скоростей на первую выбранную скорость и для обновления интерфейса
-                    - number.set:
-                        id: min_fan_speed
-                        value: !lambda 'return fan_speed;'
                     - number.set:
                         id: max_fan_speed
                         value: !lambda 'return fan_speed;'
-
+                    - number.set:
+                        id: min_fan_speed
+                        value: !lambda 'return fan_speed;'
                     # Запуск таймера для ожидания повторного вызова
-                    - globals.set:
-                        id: mode_timer
-                        value: '1'  
-                    - component.update: mode_timeout
-
+                    - globals.set: { id: mode_timer, value: 1 }
                   else:
-                    # Если вызов второй
-                    - logger.log: "Second set_fan_speed_range call detected, setting range"
-
+                    - logger.log: "tion_set_fan_speed: Second set_fan_speed call detected, setting range"
                     # Установка диапазона скоростей
                     - number.set:
                         id: min_fan_speed
@@ -77,13 +68,8 @@ api:
                     - number.set:
                         id: max_fan_speed
                         value: !lambda 'return std::max(id(last_mode), fan_speed);'
-
                     # Остановка таймера
-                    - globals.set:
-                        id: mode_timer
-                        value: '0'
-                    - component.update: mode_timeout
-
+                    - globals.set: { id: mode_timer, value: 0 }
               - logger.log:
                   format: "Fan speed set to %d"  # Логирование успешного вызова сервиса
                   args: [ 'fan_speed' ]
@@ -108,10 +94,9 @@ interval:
                 condition:
                   lambda: 'return id(mode_timer) >= 4;'
                 then:
+                  - logger.log: "tion_set_fan_speed: No second set_fan_speed call, set fixed speed"
                   # Остановка таймера
-                  - globals.set:
-                      id: mode_timer
-                      value: '0'
+                  - globals.set: { id: mode_timer, value: 0 }
             - logger.log:
                 format: "Timer set to %d"
                 args: [ 'id(mode_timer)' ]
