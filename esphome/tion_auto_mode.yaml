@@ -114,29 +114,16 @@ switch:
     turn_on_action:
       - logger.log: "switch.power_mode: turn_on_action"
       - globals.set: { id: sync_timer, value: "0" }
-      #- if:
-      #    condition: 
-      #      lambda: 'return id(max_fan_speed).state == 0;'
-      #    then:
-      #      - number.set:
-      #          id: max_fan_speed
-      #          value: !lambda 'return max(1, int(id(current_fan_speed).state));'
-      #      - number.set:
-      #          id: min_fan_speed
-      #          value: !lambda 'return max(1, int(id(current_fan_speed).state));'
-      #- if:
-      #    condition: 
-      #      switch.is_on: heater_mode
-      #    then:
-      #      climate.control:
-      #        id: tion_climate
-      #        mode: 'HEAT'
-      #        custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
-      #    else:
-      #      climate.control:
-      #        id: tion_climate
-      #        mode: 'FAN_ONLY'
-      #        custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
+      - if:
+          condition: 
+            lambda: 'return id(max_fan_speed).state == 0;'
+          then:
+            - number.set:
+                id: max_fan_speed
+                value: !lambda 'return max(1, int(id(current_fan_speed).state));'
+            - number.set:
+                id: min_fan_speed
+                value: !lambda 'return max(1, int(id(current_fan_speed).state));'
       - script.execute:
           id: set_fan_speed
           fan_speed: !lambda 'return max(1, int(id(min_fan_speed).state));'
