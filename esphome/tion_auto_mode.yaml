@@ -26,8 +26,7 @@ sensor:
     icon: "mdi:fan"
     state_class: "measurement"
     accuracy_decimals: 0
-    #filters:
-    #  - delta: 1.0
+    internal: false
             
   - platform: homeassistant
     name: "Current CO2"
@@ -38,6 +37,7 @@ sensor:
     device_class: "carbon_dioxide"
     state_class: "measurement"
     accuracy_decimals: 0
+    internal: false
 
 climate:
   - platform: pid
