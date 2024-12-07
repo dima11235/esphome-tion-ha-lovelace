@@ -92,8 +92,8 @@ script:
             - climate.control:
                 id: tion_climate
                 mode: !lambda >
-                  return  fan_speed == 0 ? "OFF" : 
-                          id(heater_mode).state ? "HEAT" : "FAN_ONLY";
+                  return  fan_speed == 0 ? 'OFF' : 
+                          id(heater_mode).state ? 'HEAT' : 'FAN_ONLY';
                 custom_fan_mode: !lambda 'return to_string(fan_speed);'
                 target_temperature: !lambda 'return id(heater_temperature).state;'
 
