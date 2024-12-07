@@ -337,7 +337,6 @@ interval:
                 condition: 
                   lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
                 then:
-                  # Включение регулятора
                   - if:
                       condition: 
                         and:
@@ -349,7 +348,6 @@ interval:
                             mode: 'COOL'
                         - logger.log: "tion_auto_mode: sync state: turn PID on"
                 else:
-                  # Отключение регулятора
                   - if:
                       condition: 
                         or:
