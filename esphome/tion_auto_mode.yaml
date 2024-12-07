@@ -113,34 +113,33 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - logger.log: "switch.power_mode: turn_on_action"
-      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
-      - globals.set: 
-          id: sync_timer
-          value: '0'
-      # Выполнение команды
-      - if:
-          condition: 
-            lambda: 'return id(max_fan_speed).state == 0;'
-          then:
-            - number.set:
-                id: max_fan_speed
-                value: !lambda 'return max(1, int(id(current_fan_speed).state));'
-            - number.set:
-                id: min_fan_speed
-                value: !lambda 'return max(1, int(id(current_fan_speed).state));'
-      - if:
-          condition: 
-            switch.is_on: heater_mode
-          then:
-            climate.control:
-              id: tion_climate
-              mode: 'HEAT'
-              custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
-          else:
-            climate.control:
-              id: tion_climate
-              mode: 'FAN_ONLY'
-              custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
+      - globals.set: { id: sync_timer, value: "0" }
+      #- if:
+      #    condition: 
+      #      lambda: 'return id(max_fan_speed).state == 0;'
+      #    then:
+      #      - number.set:
+      #          id: max_fan_speed
+      #          value: !lambda 'return max(1, int(id(current_fan_speed).state));'
+      #      - number.set:
+      #          id: min_fan_speed
+      #          value: !lambda 'return max(1, int(id(current_fan_speed).state));'
+      #- if:
+      #    condition: 
+      #      switch.is_on: heater_mode
+      #    then:
+      #      climate.control:
+      #        id: tion_climate
+      #        mode: 'HEAT'
+      #        custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
+      #    else:
+      #      climate.control:
+      #        id: tion_climate
+      #        mode: 'FAN_ONLY'
+      #        custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
+      - script.execute:
+          id: set_fan_speed
+          fan_speed: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
       - if:
           condition: 
             lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
@@ -148,24 +147,23 @@ switch:
             - climate.control:
                 id: pid_co2
                 mode: 'COOL'
-          else:
-            - climate.control:
-                id: pid_co2
-                mode: 'OFF'
+      #    else:
+      #      - climate.control:
+      #          id: pid_co2
+      #          mode: 'OFF'
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
-      # Инициализация задержки чтения конфигурации с бризера для исключения конфликтов с выполняемой командой
-      - globals.set: 
-          id: sync_timer
-          value: '0'
-      - component.update: sync_state
+      - globals.set: { id: sync_timer, value: "0" }
       # Выполнение команды
       - climate.control:
           id: pid_co2
           mode: 'OFF'
-      - climate.control:
-          id: tion_climate
-          mode: 'OFF'
+      #- climate.control:
+      #    id: tion_climate
+      #    mode: 'OFF'
+      - script.execute:
+          id: set_fan_speed
+          fan_speed: '0'
 
   # Heater mode
   - platform: template
