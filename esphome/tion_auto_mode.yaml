@@ -139,7 +139,7 @@ switch:
       #        custom_fan_mode: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
       - script.execute:
           id: set_fan_speed
-          fan_speed: !lambda 'return to_string(max(1, int(id(current_fan_speed).state)));'
+          fan_speed: !lambda 'return max(1, int(id(current_fan_speed).state));'
       - if:
           condition: 
             lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
