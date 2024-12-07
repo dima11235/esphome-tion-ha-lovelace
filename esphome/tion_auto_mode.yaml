@@ -245,7 +245,7 @@ number:
                 id: tion_climate
                 target_temperature: !lambda 'return x;'
 
-  # Target CO2 level in Auto Mode
+  # Установка целевого уровня CO2 для автоматического режима
   - platform: template
     name: "Target CO2"
     id: target_co2
