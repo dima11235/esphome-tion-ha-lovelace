@@ -89,13 +89,19 @@ script:
             lambda: 'return fan_speed != int(id(current_fan_speed).state);'
           then:
             - globals.set: { id: sync_timer, value: "0" }
-            - climate.control:
-                id: tion_climate
-                mode: !lambda >
-                  return fan_speed == 0 ? CLIMATE_MODE_OFF : 
-                         id(heater_mode).state ? CLIMATE_MODE_HEAT : CLIMATE_MODE_FAN_ONLY;
-                custom_fan_mode: !lambda 'return to_string(fan_speed);'
-                target_temperature: !lambda 'return id(heater_temperature).state;'
+            - if:
+                condition:
+                  lambda: 'return fan_speed > 0;'
+                then:
+                  - climate.control:
+                      id: tion_climate
+                      mode: !lambda 'return id(heater_mode).state ? CLIMATE_MODE_HEAT : CLIMATE_MODE_FAN_ONLY;'
+                      custom_fan_mode: !lambda 'return to_string(fan_speed);'
+                      target_temperature: !lambda 'return id(heater_temperature).state;'
+                else:
+                  - climate.control:
+                      id: tion_climate
+                      mode: 'OFF'
 
 switch:
   # Power mode
