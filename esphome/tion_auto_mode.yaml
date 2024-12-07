@@ -163,7 +163,7 @@ switch:
       #    mode: 'OFF'
       - script.execute:
           id: set_fan_speed
-          fan_speed: '0'
+          fan_speed: 0
 
   # Heater mode
   - platform: template
