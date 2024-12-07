@@ -161,7 +161,7 @@ switch:
           id: set_fan_speed
           fan_speed: 0
 
-  # Heater mode
+  # Переключатель режима подогрева воздуха
   - platform: template
     name: "Heater Mode"
     icon: "mdi:fire"
