@@ -94,7 +94,7 @@ interval:
                 condition:
                   lambda: 'return id(mode_timer) >= 4;'
                 then:
-                  - logger.log: "tion_set_fan_speed: No second set_fan_speed call, set fixed speed"
+                  - logger.log: "tion_set_fan_speed: No second set_fan_speed call, keep fixed speed"
                   # Остановка таймера
                   - globals.set: { id: mode_timer, value: "0" }
             - logger.log:
