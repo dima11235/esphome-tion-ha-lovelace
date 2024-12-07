@@ -219,29 +219,36 @@ switch:
 
 number:
   # Управление температурой подогрева воздуха
-  - platform: template
+  - platform: tion
+    type: target_temperature
+    name: Entity Name
     name: "Heater Temperature"
     icon: "mdi:thermometer"
     id: heater_temperature
-    unit_of_measurement: "°C"
-    device_class: "temperature"
-    min_value: 0
-    max_value: 30
-    step: 1
-    optimistic: true
-    restore_value: true
-    initial_value: 20
-    set_action:
-      - logger.log: "number.heater_temperature: set_action"
-      - if:
-          condition: 
-            # Не переключаем на нулевой скорости, т.к. при нулевой скорости режим забора воздуха переключается на рециркуляцию
-            lambda: 'return x != id(tion_climate).target_temperature && int(id(current_fan_speed).state) > 0;'
-          then:
-            - globals.set: { id: sync_timer, value: "0" }
-            - climate.control:
-                id: tion_climate
-                target_temperature: !lambda 'return x;'
+
+  #- platform: template
+  #  name: "Heater Temperature"
+  #  icon: "mdi:thermometer"
+  #  id: heater_temperature
+  #  unit_of_measurement: "°C"
+  #  device_class: "temperature"
+  #  min_value: 0
+  #  max_value: 30
+  #  step: 1
+  #  optimistic: true
+  #  restore_value: true
+  #  initial_value: 20
+  #  set_action:
+  #    - logger.log: "number.heater_temperature: set_action"
+  #    - if:
+  #        condition: 
+  #          # Не переключаем на нулевой скорости, т.к. при нулевой скорости режим забора воздуха переключается на рециркуляцию
+  #          lambda: 'return x != id(tion_climate).target_temperature && int(id(current_fan_speed).state) > 0;'
+  #        then:
+  #          - globals.set: { id: sync_timer, value: "0" }
+  #          - climate.control:
+  #              id: tion_climate
+  #              target_temperature: !lambda 'return x;'
 
   # Target CO2 level in Auto Mode
   - platform: template
@@ -351,7 +358,7 @@ interval:
             # Включение/отклучение регулятора автоматического режима
             - if:
                 condition: 
-                  lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;' 
+                  lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
                 then:
                   # Включение регулятора
                   - if:
