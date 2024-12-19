@@ -7,3 +7,8 @@ text_sensor:
   - platform: wifi_info
     bssid:
       name: "Wi-Fi BSSID"
+
+sensor:
+  - platform: wifi_signal
+    name: "Wi-Fi RSSI"
+    update_interval: 60s
