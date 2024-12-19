@@ -1,0 +1,9 @@
+# Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
+#
+# Вспомогательные сенсоры для Tion
+#
+
+text_sensor:
+  - platform: wifi_info
+    bssid:
+      name: "Wi-Fi BSSID"
