@@ -1,6 +1,20 @@
 # Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
 #
-# Вспомогательные сенсоры для Tion
+# substitutions:
+#   # Добавьте данную подстановку с указанием имени сенсора CO2 в раздел substitutions
+#   auto_mode_co2_sensor: sensor.chrn_kitchen_co2
+#
+# packages:
+#   # Добавьте данный пакет в раздел packages
+#   tion_auto_mode:
+#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
+#     files:
+#       # Автоматическое управление скоростью по уровню CO2
+#       - esphome/tion_auto_mode.yaml
+#       # Добавляет вызов HA, позволяющий устанавливать диапазон скоростей из интерфейса
+#       - esphome/tion_set_fan_speed.yaml
+#       # Дополнительные необязательные сенсоры, пополняемые по мере надобности
+#       - esphome/tion_others.yaml
 #
 
 text_sensor:

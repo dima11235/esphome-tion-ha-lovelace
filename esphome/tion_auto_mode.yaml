@@ -9,7 +9,12 @@
 #   tion_auto_mode:
 #     url: https://github.com/dima11235/esphome-tion-ha-lovelace
 #     files:
+#       # Автоматическое управление скоростью по уровню CO2
 #       - esphome/tion_auto_mode.yaml
+#       # Добавляет вызов HA, позволяющий устанавливать диапазон скоростей из интерфейса
+#       - esphome/tion_set_fan_speed.yaml
+#       # Дополнительные необязательные сенсоры, пополняемые по мере надобности
+#       - esphome/tion_others.yaml
 #
 
 globals:
