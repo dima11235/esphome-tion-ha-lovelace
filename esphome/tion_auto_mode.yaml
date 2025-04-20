@@ -1,4 +1,5 @@
 # Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
+# Автоматическое управление скоростью по уровню CO2
 #
 # substitutions:
 #   # Добавьте данную подстановку с указанием имени сенсора CO2 в раздел substitutions
@@ -22,6 +23,14 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+
+  # Элемент для отслеживания текущей установленной данным пакетом скорости бризера
+  # Если реальная скорость бризера отличается, то значит она была изменена с пульта управления
+  # и автоматическое управление бризером отключается
+  - id: internal_fan_speed
+    type: int
+    restore_value: no
+    initial_value: '-1'
 
 sensor:
   - platform: tion
@@ -107,6 +116,7 @@ script:
                   - climate.control:
                       id: tion_climate
                       mode: 'OFF'
+            - globals.set: { id: internal_fan_speed, value: !lambda 'return fan_speed;' }
 
 switch:
   # Переключатель включения бризера
@@ -329,6 +339,7 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
 
+# Синхронизация состояния бризера и элементов управления этого пакета раз в 10 секунд
 interval:
   - interval: 1s
     id: sync_state
@@ -340,6 +351,7 @@ interval:
             lambda: 'return id(sync_timer)++ >= 10;' 
           then:
             - globals.set: { id: sync_timer, value: "0" }
+
             # Включение/отклучение регулятора автоматического режима
             - if:
                 condition: 
@@ -366,6 +378,7 @@ interval:
                             id: pid_co2
                             mode: 'OFF'
                         - logger.log: "tion_auto_mode: sync state: turn PID off"
+
             # Чтение с бризера статуса включения
             - if: 
                 condition: 
@@ -375,6 +388,7 @@ interval:
                 then:
                   - logger.log: "tion_auto_mode: sync state: turn power_mode on"
                   - switch.turn_on: power_mode
+
             # Чтение с бризера установленной температуры
             - if: 
                 condition: 
@@ -386,6 +400,7 @@ interval:
                   - number.set:
                       id: heater_temperature
                       value: !lambda 'return id(tion_climate).target_temperature;'
+
             # Чтение с бризера статуса нагревателя
             - if: 
                 condition: 
@@ -403,3 +418,8 @@ interval:
                 then:
                   - logger.log: "tion_auto_mode: sync state: set heater_mode off"
                   - switch.turn_off: heater_mode
+
+            # Чтение с бризера установленной скорости
+            # Если скорость отличается от установленной, то отключение автоматического режима 
+            # и установка скорости по бризеру
+
