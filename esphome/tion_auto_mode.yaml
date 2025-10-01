@@ -90,7 +90,7 @@ output:
                 else:
                   - script.execute:
                       id: set_fan_speed
-                      fan_speed: !lambda 'return min(max(round(6*state), id(min_fan_speed).state), id(max_fan_speed).state);'
+                      fan_speed: !lambda 'return std::max<float>(id(min_fan_speed).state, std::min<float>(id(max_fan_speed).state, std::roundf(6.0f * state)));'
 
 script:
   - id: set_fan_speed

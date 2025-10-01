@@ -62,10 +62,10 @@ api:
                     # Установка диапазона скоростей
                     - number.set:
                         id: min_fan_speed
-                        value: !lambda 'return std::min(id(last_mode), fan_speed);'
+                        value: !lambda 'return std::min<int32_t>(static_cast<int32_t>(id(last_mode)), static_cast<int32_t>(fan_speed));'
                     - number.set:
                         id: max_fan_speed
-                        value: !lambda 'return std::max(id(last_mode), fan_speed);'
+                        value: !lambda 'return std::max<int32_t>(static_cast<int32_t>(id(last_mode)), static_cast<int32_t>(fan_speed));'
                     # Остановка таймера
                     - globals.set: { id: mode_timer, value: "0" }
               - logger.log:
