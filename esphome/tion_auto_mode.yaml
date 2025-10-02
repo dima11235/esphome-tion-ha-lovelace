@@ -90,7 +90,11 @@ output:
                 else:
                   - script.execute:
                       id: set_fan_speed
-                      fan_speed: !lambda 'return std::max<float>(id(min_fan_speed).state, std::min<float>(id(max_fan_speed).state, std::roundf(6.0f * state)));'
+                      fan_speed: !lambda |-
+                        const int32_t min_speed = static_cast<int32_t>(std::lround(id(min_fan_speed).state));
+                        const int32_t max_speed = static_cast<int32_t>(std::lround(id(max_fan_speed).state));
+                        const int32_t requested = static_cast<int32_t>(std::lround(6.0f * state));
+                        return std::max<int32_t>(min_speed, std::min<int32_t>(max_speed, requested));
 
 script:
   - id: set_fan_speed
