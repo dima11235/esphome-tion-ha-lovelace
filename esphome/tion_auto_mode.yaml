@@ -53,6 +53,19 @@ sensor:
     accuracy_decimals: 0
     internal: false
 
+  - platform: template
+    name: "Target CO2 Sensor"
+    id: target_co2_sensor
+    unit_of_measurement: "ppm"
+    icon: "mdi:molecule-co2"
+    device_class: "carbon_dioxide"
+    state_class: "measurement"
+    accuracy_decimals: 0
+    update_interval: 60s
+    force_update: true
+    lambda: |-
+      return id(target_co2).state;
+
 climate:
   - platform: pid
     id: pid_co2
