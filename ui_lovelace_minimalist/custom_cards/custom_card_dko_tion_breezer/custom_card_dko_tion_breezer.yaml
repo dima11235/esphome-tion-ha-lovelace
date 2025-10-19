@@ -1,0 +1,944 @@
+---
+### Breezer Card ###
+card_dko_tion_breezer:
+  template:
+    - "ulm_translation_engine"
+    - "icon_more_info_new"
+    - "card_tion_breezer_language_variables"
+  variables:
+    breezer_entity_prefix: "[[[ return entity.entity_id.toLowerCase().replace(/^climate\\./,'') ]]]"
+    ulm_card_breezer_entity_power_mode: "[[[ return 'switch.' + variables.breezer_entity_prefix + '_power_mode' ]]]"
+    ulm_card_breezer_entity_heater_mode: "[[[ return 'switch.' + variables.breezer_entity_prefix + '_heater_mode' ]]]"
+    ulm_card_breezer_entity_silent_mode: "[[[ return 'switch.' + variables.breezer_entity_prefix + '_silent_mode' ]]]"
+    ulm_card_breezer_entity_heater_temperature: "[[[ return 'number.' + variables.breezer_entity_prefix + '_heater_temperature' ]]]"
+    ulm_card_breezer_entity_target_co2: "[[[ return 'number.' + variables.breezer_entity_prefix + '_target_co2' ]]]"
+    ulm_card_breezer_entity_current_co2: "[[[ return 'sensor.' + variables.breezer_entity_prefix + '_current_co2' ]]]"
+    ulm_card_breezer_entity_fan_speed: "[[[ return 'sensor.' + variables.breezer_entity_prefix + '_fan_speed' ]]]"
+    ulm_card_breezer_entity_min_fan_speed: "[[[ return 'number.' + variables.breezer_entity_prefix + '_min_fan_speed' ]]]"
+    ulm_card_breezer_entity_max_fan_speed: "[[[ return 'number.' + variables.breezer_entity_prefix + '_max_fan_speed' ]]]"
+    ulm_card_breezer_entity_air_intake: "[[[ return 'select.' + variables.breezer_entity_prefix + '_air_intake' ]]]"
+    ulm_card_breezer_entity_recirculation: "[[[ return 'switch.' + variables.breezer_entity_prefix + '_recirculation' ]]]"
+    ulm_card_breezer_entity_outdoor_temperature: "[[[ return 'sensor.' + variables.breezer_entity_prefix + '_outdoor_temperature' ]]]"
+    ulm_card_breezer_service_set_fan_speed: "[[[ return 'esphome.' + variables.breezer_entity_prefix + '_set_fan_speed' ]]]"
+    ulm_card_breezer_switch_socket: "[[[ return 'switch.socket_' + variables.breezer_entity_prefix ]]]"
+    ulm_card_breezer_name: "[[[ return entity.attributes.friendly_name ]]]"
+    ulm_card_breezer_icon: "[[[ return 'mdi:air-filter' ]]]"
+    ulm_card_breezer_enable_collapse: false
+    ulm_card_breezer_enable_controls: true
+    ulm_card_breezer_enable_background_color: false
+    ulm_card_breezer_enable_horizontal: false
+    ulm_card_breezer_enable_popup: true
+  show_icon: false
+  show_name: false
+  show_label: false
+  triggers_update: all
+  styles:
+    grid:
+      - grid-template-areas: >
+          [[[
+                if (variables.ulm_card_breezer_enable_horizontal) {
+                  return "\"item1 item4\"";
+                }
+                var areas = [];
+                areas.push("item1 item1");
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls) {
+                    areas.push("item3 item3");
+                    areas.push("item4 item4");
+                }
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on') {
+                    areas.push("item2 item2");
+                }
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls) {
+                    areas.push("item5 item5");
+                }
+                return "\"" + areas.join("\" \"") + "\"";
+          ]]]
+      - grid-template-columns: >
+          [[[
+                  return variables.ulm_card_breezer_enable_horizontal ? "1fr 1fr" : "2fr 1fr";
+          ]]]
+      - grid-template-rows: >
+          [[[
+                var rows = [];
+                if (variables.ulm_card_breezer_enable_horizontal) {
+                  return "min-content";
+                }
+                rows.push("min-content");
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls) {
+                    rows.push("min-content");
+                    rows.push("min-content");
+                }
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on') {
+                    rows.push("min-content");
+                }
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls) {
+                    rows.push("min-content");
+                }
+                return rows.join(" ");
+          ]]]
+      - row-gap: "12px"
+    card:
+      - --breezer-base-color: >
+          [[[
+            const powerState = (states[variables.ulm_card_breezer_entity_power_mode]?.state ?? 'off').toLowerCase();
+            const heaterState = (states[variables.ulm_card_breezer_entity_heater_mode]?.state ?? '').toLowerCase();
+            const mix = (cssVar, weight) => `color-mix(in srgb, var(${cssVar}) ${weight}%, transparent)`;
+
+            const colorVar = heaterState === 'on' && powerState === 'on'
+              ? '--state-climate-heat-color'
+              : heaterState === 'off' && powerState === 'on'
+                ? '--state-climate-fan_only-color'
+                : '--state-inactive-color';
+
+            if (!variables.ulm_card_breezer_enable_background_color) {
+              return 'var(--card-background-color, transparent)';
+            }
+
+            return mix(colorVar, colorVar === '--state-inactive-color' ? 20 : 40);
+          ]]]
+      - --breezer-hover-color: >
+          [[[
+            const powerState = (states[variables.ulm_card_breezer_entity_power_mode]?.state ?? 'off').toLowerCase();
+            const heaterState = (states[variables.ulm_card_breezer_entity_heater_mode]?.state ?? '').toLowerCase();
+            const mix = (cssVar, weight) => `color-mix(in srgb, var(${cssVar}) ${weight}%, transparent)`;
+
+            const colorVar = heaterState === 'on' && powerState === 'on'
+              ? '--state-climate-heat-color'
+              : heaterState === 'off' && powerState === 'on'
+                ? '--state-climate-fan_only-color'
+                : '--state-inactive-color';
+
+            if (!variables.ulm_card_breezer_enable_background_color) {
+              const weight = colorVar === '--state-inactive-color' ? 2 : 4;
+              return `color-mix(in srgb, var(--card-background-color, transparent) ${100 - weight}%, var(${colorVar}) ${weight}%)`;
+            }
+
+            return mix(colorVar, colorVar === '--state-inactive-color' ? 24 : 48);
+          ]]]
+      - transition: background 0.25s ease, box-shadow 0.25s ease
+      - cursor: pointer
+      - border-radius: "var(--border-radius)"
+      - box-shadow: "var(--box-shadow)"
+      - overflow: "hidden"
+      - padding: "12px"
+    custom_fields:
+      item2:
+        - display: >
+            [[[
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && !variables.ulm_card_breezer_enable_horizontal ) {
+                      return "block";
+                  } else {
+                      return "none";
+                  }
+            ]]]
+      item3:
+        - display: >
+            [[[
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls && !variables.ulm_card_breezer_enable_horizontal ) {
+                      return "block";
+                  } else {
+                      return "none";
+                  }
+            ]]]
+      item4:
+        - display: >
+            [[[
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls ) {
+                      return "block";
+                  } else {
+                      return "none";
+                  }
+            ]]]
+      item5:
+        - display: >
+            [[[
+                if ( !(variables.ulm_card_breezer_enable_collapse && states[variables.ulm_card_breezer_entity_power_mode].state == "off") && variables.ulm_card_breezer_enable_controls && !variables.ulm_card_breezer_enable_horizontal ) {
+                      return "block";
+                  } else {
+                      return "none";
+                  }
+            ]]]
+  card_mod:
+    style: |
+      :host {
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        display: block;
+      }
+      ha-card {
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        background: var(--breezer-base-color, var(--card-background-color, transparent));
+        transition: background 150ms ease, box-shadow 150ms ease;
+      }
+      :host(:hover) ha-card,
+      ha-card:hover,
+      ha-card:focus-visible {
+        background: var(--breezer-hover-color) !important;
+        box-shadow: 0 1px 3px -6px rgba(0, 0, 0, 0.15);
+      }
+  custom_fields:
+    item1:
+      card:
+        type: "custom:button-card"
+        custom_fields:
+          item1:
+            card:
+              type: "custom:button-card"
+              entity: "[[[ return entity.entity_id ]]]"
+              template:
+                - card_dko_popup_tion_breezer
+              variables: "[[[ return variables ]]]"
+              icon: "[[[ return variables.ulm_card_breezer_icon ]]]"
+              custom_fields:
+                badge: >
+                  [[[
+                    const fan = states[variables.ulm_card_breezer_entity_fan_speed];
+                    if (!fan || fan.state === undefined || fan.state === 'unavailable') {
+                      return '--';
+                    }
+                    const value = Number(fan.state);
+                    if (!Number.isFinite(value)) {
+                      return fan.state ?? '--';
+                    }
+                    return Math.round(value).toString();
+                  ]]]
+              styles:
+                card:
+                  - position: "relative"
+                  - overflow: "visible"
+                  - padding-top: "6px"
+                img_cell:
+                  - overflow: "visible"
+                icon:
+                  - overflow: "visible"
+                custom_fields:
+                  badge:
+                    - position: "absolute"
+                    - top: "0px"
+                    - right: "-2px"
+                    - z-index: 2
+                    - transform: "none"
+                    - background-color: >
+                        [[[
+                          const power = states[variables.ulm_card_breezer_entity_power_mode]?.state;
+                          const heater = states[variables.ulm_card_breezer_entity_heater_mode]?.state;
+                          if (power === 'on' && heater === 'on') {
+                            return 'var(--state-climate-heat-color)';
+                          }
+                          if (power === 'on') {
+                            return 'rgba(var(--color-green),1)';
+                          }
+                          return 'rgba(var(--color-theme),0.6)';
+                        ]]]
+                    - color: "var(--primary-background-color)"
+                    - border-radius: "999px"
+                    - padding: "0"
+                    - font-size: "10px"
+                    - font-weight: "600"
+                    - height: "16px"
+                    - min-width: "16px"
+                    - line-height: "16px"
+                    - text-align: "center"
+                    - display: "inline-flex"
+                    - align-items: "center"
+                    - justify-content: "center"
+              state:
+                - operator: "template"
+                  value: >
+                    [[[
+                      return ( states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' )
+                    ]]]
+                  styles:
+                    icon:
+                      - color: "var(--state-climate-heat-color)"
+                    img_cell:
+                      - background-color: "color-mix(in srgb, var(--state-climate-heat-color) 20%, transparent)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return ( states[variables.ulm_card_breezer_entity_heater_mode].state != 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' )
+                    ]]]
+                  styles:
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                    img_cell:
+                      - background-color: "rgba(var(--color-green),0.2)"
+          item2:
+            card:
+              type: "custom:button-card"
+              template:
+                - card_dko_popup_tion_breezer
+              entity: "[[[ return entity.entity_id ]]]"
+              variables: "[[[ return variables ]]]"
+              name: "[[[ return variables.ulm_card_breezer_name ]]]"
+              label: >-
+                [[[
+                    var label = Math.round(Number(states[variables.ulm_card_breezer_entity_current_co2]?.state ?? 0)) + " ppm | ";
+                    label = label + entity.attributes.current_temperature + " degC | ";
+                    if ( states[variables.ulm_card_breezer_entity_silent_mode]?.state == "on" ) {
+                      label = label + variables.ulm_custom_card_tion_silent_mode;
+                    } else {
+                      label = label + Math.round(Number(states[variables.ulm_card_breezer_entity_fan_speed]?.state ?? 0)) + " " + variables.ulm_custom_card_tion_breezer_speed;
+                    }
+                    return label;
+                ]]]
+    item2:
+      card:
+        type: "custom:button-card"
+        template: "list_3_items"
+        styles:
+          card:
+            - background: "none"
+        custom_fields:
+          item1:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              entity: "[[[ return variables.ulm_card_breezer_entity_heater_temperature ]]]"
+              icon: "mdi:minus"
+              tap_action:
+                action: "call-service"
+                service: "number.set_value"
+                service_data:
+                  value: |
+                    [[[
+                      var heater_temp = states[variables.ulm_card_breezer_entity_heater_temperature];
+                      if (!heater_temp || heater_temp.state == null || heater_temp.state === "unavailable") {
+                          return 20;
+                      } else {
+                          const step = heater_temp.attributes?.step || 1;
+                          const state_value = parseFloat(heater_temp.state);
+                          if (isNaN(state_value)) {
+                              return 20; 
+                          }
+                          return state_value - step;                        
+                      }
+                    ]]]
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_heater_temperature ]]]"
+              state:
+                - operator: "template"
+                  value: >
+                    [[[
+                      return (entity.attributes.hvac_action == 'fan_only' || states[variables.ulm_card_breezer_entity_heater_mode].state == 'on') && variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          item2:
+            card:
+              type: "custom:button-card"
+              show_icon: false
+              show_name: false
+              show_label: true
+              entity: "[[[ return variables.ulm_card_breezer_entity_heater_temperature ]]]"
+              label: |-
+                [[[
+                    var target_temperature = states[variables.ulm_card_breezer_entity_heater_temperature]?.state;
+                    var unit = states[variables.ulm_card_breezer_entity_heater_temperature]?.attributes?.unit_of_measurement || "";
+                    if (target_temperature == null || target_temperature === "unavailable" || isNaN(Number(target_temperature))) {
+                        target_temperature = '- ';
+                    } else {
+                        target_temperature = Math.round(Number(target_temperature));
+                    }
+                    return `${target_temperature}${unit}`;                    
+                ]]]
+              styles:
+                card:
+                  - background: "none"
+                  - box-shadow: "none"
+                label:
+                  - font-size: "14px"
+          item3:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              entity: "[[[ return entity.entity_id ]]]"
+              icon: "mdi:plus"
+              tap_action:
+                action: "call-service"
+                service: "number.set_value"
+                service_data:
+                  value: |
+                    [[[
+                      var heater_temp = states[variables.ulm_card_breezer_entity_heater_temperature];
+                      if (!heater_temp || heater_temp.state == null || heater_temp.state === "unavailable") {
+                          return 20;
+                      } else {
+                          const step = heater_temp.attributes?.step || 1;
+                          const state_value = parseFloat(heater_temp.state);
+                          if (isNaN(state_value)) {
+                              return 20; 
+                          }
+                          return state_value + step;                        
+                      }
+                    ]]]
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_heater_temperature ]]]"
+              state:
+                - operator: "template"
+                  value: >
+                    [[[
+                      return (states[variables.ulm_card_breezer_entity_heater_mode].state != 'on' || states[variables.ulm_card_breezer_entity_heater_mode].state == 'on') && variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+    item3:
+      card:
+        type: "custom:button-card"
+        template: "list_3_items"
+        styles:
+          card:
+            - background: "none"
+        custom_fields:
+          item1:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              entity: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+              icon: "mdi:minus"
+              tap_action:
+                action: "call-service"
+                service: "number.set_value"
+                service_data:
+                  value: |
+                    [[[
+                      var target_co2 = states[variables.ulm_card_breezer_entity_target_co2];
+                      if (!target_co2 || target_co2.state == null || target_co2.state === "unavailable") {
+                          return 750;
+                      } else {
+                          const step = target_co2.attributes?.step || 50;
+                          const state_value = parseFloat(target_co2.state);
+                          if (isNaN(state_value)) {
+                              return 750;
+                          }
+                          return state_value - step;
+                      }                        
+                    ]]]
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+              state:
+                - operator: "template"
+                  value: >
+                    [[[
+                      return (states[variables.ulm_card_breezer_entity_heater_mode].state != 'on' || states[variables.ulm_card_breezer_entity_heater_mode].state == 'on') && variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          item2:
+            card:
+              type: "custom:button-card"
+              show_icon: false
+              show_name: false
+              show_label: true
+              entity: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+              label: |-
+                [[[
+                    var target_co2 = states[variables.ulm_card_breezer_entity_target_co2]?.state;
+                    var unit = states[variables.ulm_card_breezer_entity_target_co2]?.attributes?.unit_of_measurement || "";
+                    if (target_co2 == null || target_co2 === "unavailable" || isNaN(Number(target_co2))) {
+                        target_co2 = '- ';
+                    } else {
+                        target_co2 = Math.round(Number(target_co2));
+                    }
+                    return `${target_co2}${unit}`;
+                ]]]
+              styles:
+                card:
+                  - background: "none"
+                  - box-shadow: "none"
+                label:
+                  - font-size: "14px"
+          item3:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              entity: "[[[ return entity.entity_id ]]]"
+              icon: "mdi:plus"
+              tap_action:
+                action: "call-service"
+                service: "number.set_value"
+                service_data:
+                  value: |
+                    [[[
+                      var target_co2 = states[variables.ulm_card_breezer_entity_target_co2];
+                      if (!target_co2 || target_co2.state == null || target_co2.state === "unavailable") {
+                          return 750;
+                      } else {
+                          const step = target_co2.attributes?.step || 50;
+                          const state_value = parseFloat(target_co2.state);
+                          if (isNaN(state_value)) {
+                              return 750;
+                          }
+                          return state_value + step;
+                      }                        
+                    ]]]
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+              state:
+                - operator: "template"
+                  value: >
+                    [[[
+                      return (states[variables.ulm_card_breezer_entity_heater_mode].state != 'on' || states[variables.ulm_card_breezer_entity_heater_mode].state == 'on') && variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+    item4:
+      card:
+        type: "custom:button-card"
+        styles:
+          grid:
+            - grid-template-areas: >
+                [[[
+                      return "\"speed0 speed1 speed2 speed3 speed4 speed5 speed6\"";
+                ]]]
+            - grid-template-columns: >
+                [[[
+                      return "1fr 1fr 1fr 1fr 1fr 1fr 1fr";
+                ]]]
+            - grid-template-rows: "min-content"
+            - column-gap: "7px"
+          card:
+            - box-shadow: "none"
+            - padding: "0px"
+            - background: "none"
+          custom_fields:
+            speed0:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            speed1:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            speed2:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            speed3:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            speed4:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            speed5:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            speed6:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+        custom_fields:
+          speed0:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-0"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "0"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 0 && 0 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 0 && 0 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 0 && 0 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          speed1:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-1"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "1"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 1 && 1 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 1 && 1 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 1 && 1 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          speed2:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-2"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "2"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 2 && 2 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 2 && 2 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 2 && 2 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          speed3:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-3"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "3"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 3 && 3 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 3 && 3 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 3 && 3 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          speed4:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-4"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "4"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 4 && 4 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 4 && 4 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 4 && 4 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          speed5:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-5"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "5"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 5 && 5 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 5 && 5 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 5 && 5 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          speed6:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:numeric-6"
+              tap_action:
+                action: "call-service"
+                service: "[[[ return variables.ulm_card_breezer_service_set_fan_speed; ]]]"
+                service_data:
+                  fan_speed: "6"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 6 && 6 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 6 && 6 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_min_fan_speed].state <= 6 && 6 <= states[variables.ulm_card_breezer_entity_max_fan_speed].state && states[variables.ulm_card_breezer_entity_power_mode].state == 'off' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-theme),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+    item5:
+      card:
+        type: "custom:button-card"
+        styles:
+          grid:
+            - grid-template-areas: >
+                [[[
+                      return "\"turn_off heat fan_only\"";
+                ]]]
+            - grid-template-columns: >
+                [[[
+                      return "1fr 1fr 1fr";
+                ]]]
+            - grid-template-rows: "min-content"
+            - column-gap: "7px"
+          card:
+            - box-shadow: "none"
+            - padding: "0px"
+            - background: "none"
+          custom_fields:
+            heat:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            fan_only:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+            power_off:
+              - display: >
+                  [[[
+                    return "block";
+                  ]]]
+        custom_fields:
+          heat:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:fire"
+              tap_action:
+                action: "call-service"
+                service: "switch.turn_on"
+                service_data:
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_heater_mode ]]]"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_heater_mode].state == 'on' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "var(--state-climate-heat-color)"
+                    icon:
+                      - color: "rgb(255, 255, 255)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          fan_only:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:fan"
+              tap_action:
+                action: "call-service"
+                service: "switch.turn_off"
+                service_data:
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_heater_mode ]]]"
+              state:
+                - operator: "template"
+                  value: "[[[ return states[variables.ulm_card_breezer_entity_heater_mode].state == 'off' && states[variables.ulm_card_breezer_entity_power_mode].state == 'on' ]]]"
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.5)"
+                    icon:
+                      - color: "rgba(var(--color-green),1)"
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"
+          turn_off:
+            card:
+              type: "custom:button-card"
+              template: "widget_icon"
+              icon: "mdi:fan-off"
+              tap_action:
+                action: "call-service"
+                service: "switch.turn_off"
+                service_data:
+                  entity_id: "[[[ return variables.ulm_card_breezer_entity_power_mode ]]]"
+              state:
+                - operator: "template"
+                  value: >
+                    [[[
+                      return states[variables.ulm_card_breezer_entity_power_mode].state == "off"
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: >
+                          [[[
+                              return "rgba(var(--color-theme),0.5)";
+                          ]]]
+                    icon:
+                      - color: >
+                          [[[
+                              "rgba(var(--color-theme),1)";
+                          ]]]
+                - operator: "template"
+                  value: >
+                    [[[
+                      return variables.ulm_card_breezer_enable_background_color
+                    ]]]
+                  styles:
+                    card:
+                      - background-color: "rgba(var(--color-theme),0.15)"

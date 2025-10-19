@@ -1,22 +1,4 @@
-﻿# Расширение конфигурации ESPHOME для устройства Тион (https://github.com/dentra/esphome-tion)
-# Добавляет вызов HA, позволяющий устанавливать диапазон скоростей из интерфейса
-#
-# substitutions:
-#   # Добавьте данную подстановку с указанием имени сенсора CO2 в раздел substitutions
-#   auto_mode_co2_sensor: sensor.chrn_kitchen_co2
-#
-# packages:
-#   # Добавьте данный пакет в раздел packages
-#   tion_auto_mode:
-#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
-#     files:
-#       # Автоматическое управление скоростью по уровню CO2
-#       - esphome/tion_auto_mode.yaml
-#       # Добавляет вызов HA, позволяющий устанавливать диапазон скоростей из интерфейса
-#       - esphome/tion_set_fan_speed.yaml
-#       # Дополнительные необязательные сенсоры, пополняемые по мере надобности
-#       - esphome/tion_others.yaml
-#
+### ESPHome package: helper services for manual fan speed control
 
 globals:
   - id: last_mode
@@ -31,50 +13,45 @@ globals:
 
 api:
   services:
-    - service: set_fan_speed  # Определение нового сервиса set_fan_speed
+    - service: set_fan_speed
       variables:
-        fan_speed: int  # Ожидаемый параметр скорости вентилятора
+        fan_speed: int
       then:
         - if:
             condition:
-              lambda: 'return fan_speed >= 0 && fan_speed <= 6;'  # Проверка, что скорость в допустимом диапазоне (0-6)
+              lambda: 'return fan_speed >= 0 && fan_speed <= 6;'
             then:
               - if:
                   condition:
-                    lambda: 'return id(mode_timer) == 0;' # Если вызов первый
+                    lambda: 'return id(mode_timer) == 0;'
                   then:
                     - logger.log: "tion_set_fan_speed: First set_fan_speed call detected, setting first speed, waiting for second ..."
-                    # Сохраняем режим для первого вызова
                     - globals.set:
                         id: last_mode
-                        value: !lambda 'return fan_speed;'  
-                    # Установка значений диапазона скоростей на первую выбранную скорость и для обновления интерфейса
+                        value: !lambda 'return fan_speed;'
                     - number.set:
                         id: max_fan_speed
                         value: !lambda 'return fan_speed;'
                     - number.set:
                         id: min_fan_speed
                         value: !lambda 'return fan_speed;'
-                    # Запуск таймера для ожидания повторного вызова
                     - globals.set: { id: mode_timer, value: "1" }
                   else:
                     - logger.log: "tion_set_fan_speed: Second set_fan_speed call detected, setting range"
-                    # Установка диапазона скоростей
                     - number.set:
                         id: min_fan_speed
                         value: !lambda 'return std::min<int>(static_cast<int>(id(last_mode)), static_cast<int>(fan_speed));'
                     - number.set:
                         id: max_fan_speed
                         value: !lambda 'return std::max<int>(static_cast<int>(id(last_mode)), static_cast<int>(fan_speed));'
-                    # Остановка таймера
                     - globals.set: { id: mode_timer, value: "0" }
               - logger.log:
-                  format: "Fan speed set to %d"  # Логирование успешного вызова сервиса
+                  format: "Fan speed set to %d"
                   args: [ 'fan_speed' ]
             else:
               - logger.log:
                   level: ERROR
-                  format: "Invalid fan speed value: %d"  # Логирование ошибки в случае недопустимого значения
+                  format: "Invalid fan speed value: %d"
                   args: [ 'fan_speed' ]
 
 interval:
@@ -93,7 +70,6 @@ interval:
                   lambda: 'return id(mode_timer) >= 4;'
                 then:
                   - logger.log: "tion_set_fan_speed: No second set_fan_speed call, keep fixed speed"
-                  # Остановка таймера
                   - globals.set: { id: mode_timer, value: "0" }
             - logger.log:
                 format: "Timer set to %d"

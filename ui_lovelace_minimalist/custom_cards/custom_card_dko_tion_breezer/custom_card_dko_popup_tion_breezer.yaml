@@ -1,0 +1,278 @@
+---
+### Breezer Popup Card ###
+card_dko_popup_tion_breezer:
+  tap_action:
+    action: "fire-dom-event"
+    browser_mod:
+      service: "browser_mod.popup"
+      data:
+        title: "[[[ return entity.attributes.friendly_name ]]]"
+        style: |
+          ha-dialog > div { 
+            outline: none !important;
+          }
+          --popup-background-color: var(--primary-background-color);
+          --popup-border-radius: 20px;
+          --popup-padding-x: 24px;
+          --popup-padding-y: 20px;
+          --popup-min-width: 600px;
+        size: >
+          [[[
+            return window.matchMedia('(max-width: 800px)').matches ? 'fullscreen' : 'normal'
+          ]]]
+        content:
+          type: entities
+          show_header_toggle: false
+          entities:
+            - type: custom:button-card
+              entity: "[[[ return variables.ulm_card_breezer_entity_fan_speed ]]]"
+              name: "[[[ return variables.ulm_custom_card_tion_breezer_speed ]]]"
+              icon: mdi:air-filter
+              show_state: false
+              show_label: false
+              tap_action:
+                action: "more-info"
+                entity: "[[[ return entity.entity_id ]]]"
+              hold_action:
+                action: "none"
+              custom_fields:
+                value: >
+                  [[[
+                    const fan = states[variables.ulm_card_breezer_entity_fan_speed];
+                    if (!fan || fan.state === undefined || fan.state === 'unavailable') {
+                      return fan?.state ?? '-';
+                    }
+                    const current = Number(fan.state);
+                    if (!Number.isFinite(current)) {
+                      return fan.state;
+                    }
+                    const safeMax = 6;
+                    return Math.round(current) + ' / ' + safeMax;
+                  ]]]
+                bar: >
+                  [[[
+                    const fan = states[variables.ulm_card_breezer_entity_fan_speed];
+                    const current = Number(fan?.state);
+                    const safeMax = 6;
+                    const ratio = Number.isFinite(current) && safeMax > 0 ? current / safeMax : 0;
+                    const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+                    return "<div style='position:relative;height:10px;border-radius:999px;background:rgba(var(--color-theme),0.12);overflow:hidden;'><div style='position:absolute;top:0;bottom:0;left:0;width:" + percent + "%;border-radius:inherit;background:rgba(var(--color-green),0.7);'></div></div>";
+                  ]]]
+              styles:
+                grid:
+                  - grid-template-areas: '"i n value" "bar bar bar"'
+                  - grid-template-columns: min-content auto min-content
+                  - grid-template-rows: min-content min-content
+                  - column-gap: 12px
+                  - row-gap: 4px
+                card:
+                  - box-shadow: "none"
+                  - border: "none"
+                  - background: "none"
+                  - padding: "8px 0 4px"
+                icon:
+                  - width: "28px"
+                  - height: "28px"
+                  - color: "var(--primary-text-color)"
+                  - margin-left: "8px"
+                name:
+                  - font-weight: "500"
+                  - font-size: "14px"
+                  - align-self: "center"
+                  - color: "rgba(var(--color-theme),0.9)"
+                custom_fields:
+                  value:
+                    - grid-area: value
+                    - font-weight: "600"
+                    - font-size: "14px"
+                    - align-self: "center"
+                    - justify-self: "end"
+                    - margin-right: "8px"
+                    - color: "var(--primary-text-color)"
+                  bar:
+                    - grid-area: bar
+                    - width: "calc(100% - 16px)"
+                    - margin: "0 8px"
+                    - align-self: "center"
+                    - border-radius: "999px"
+                    - overflow: "hidden"
+                    - --ha-card-border-radius: "999px"
+                    - --button-card-border-radius: "999px"
+
+            - entity: "[[[ return variables.ulm_card_breezer_switch_socket ]]]"
+              name: "Breezer Socket"
+            - entity: "[[[ return variables.ulm_card_breezer_entity_power_mode ]]]"
+              name: "Main Power"
+            - entity: "[[[ return variables.ulm_card_breezer_entity_silent_mode ]]]"
+              name: "Silent Mode"
+            - entity: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+              name: "Target CO2"
+            - entity: "[[[ return variables.ulm_card_breezer_entity_min_fan_speed ]]]"
+              name: "Fan Speed (min)"
+            - entity: "[[[ return variables.ulm_card_breezer_entity_max_fan_speed ]]]"
+              name: "Fan Speed (max)"
+            - entity: "[[[ return variables.ulm_card_breezer_entity_heater_mode ]]]"
+              name: "PTC Heater"
+
+            - type: conditional
+              conditions:
+                - entity: "[[[ return variables.ulm_card_breezer_entity_heater_mode ]]]"
+                  state: "on"
+              row:
+                type: custom:slider-entity-row
+                entity: "[[[ return variables.ulm_card_breezer_entity_heater_temperature ]]]"
+                name: "Heater Temperature"
+                icon: mdi:thermometer
+                hide_state: false
+
+            - entity: >
+                [[[ 
+                    return (states[variables.ulm_card_breezer_entity_air_intake]) ?
+                        variables.ulm_card_breezer_entity_air_intake : variables.ulm_card_breezer_entity_recirculation 
+                ]]]
+              name: >
+                [[[ 
+                    return (states[variables.ulm_card_breezer_entity_air_intake]) ?
+                        "Air Intake" : "Recirculation" 
+                ]]]
+
+            - entity: "[[[ return variables.ulm_card_breezer_entity_outdoor_temperature ]]]"
+              name: "Outdoor Temperature"
+
+            - entity: "[[[ return entity.entity_id ]]]"
+              type: attribute
+              attribute: current_temperature
+              name: "Supply Temperature"
+
+            - type: divider
+
+            - type: custom:apexcharts-card
+              graph_span: 24h
+              update_interval: 30s
+              experimental:
+                color_threshold: true
+              header:
+                show: false
+              now:
+                show: false
+              apex_config:
+                chart:
+                  height: 200px
+                  background: 'transparent'
+                  toolbar:
+                    show: false
+                dataLabels:
+                  enabled: false
+                grid:
+                  strokeDashArray: 4
+                  borderColor: 'rgba(160, 160, 160, 0.25)'
+                legend:
+                  show: true
+                  position: 'bottom'
+                  horizontalAlign: 'center'
+                tooltip:
+                  shared: true
+                  x:
+                    format: 'HH:mm'
+                # annotations:
+                #   yaxis:
+                #     - y: "[[[ return states[variables.ulm_card_breezer_entity_target_co2].state ]]]"
+                #       yaxis_id: co2
+                #       borderColor: "var(--red-color)"
+                #       borderWidth: 2
+                #       label:
+                #         text: "Target CO2"
+                #         borderWidth: 0
+                #         style:
+                #           color: "var(--red-color)"
+                #           background: transparent
+              yaxis:
+                - id: co2
+                  min: 400
+                  max: 1200
+                  apex_config:
+                    tickAmount: 8
+                    forceNiceScale: false
+                    title:
+                      text: ppm
+                - id: speed
+                  min: 0
+                  max: 6
+                  apex_config:
+                    tickAmount: 6
+                    forceNiceScale: false
+                    title:
+                      text: fan speed
+                  opposite: true
+              series:
+                - entity: "[[[ return variables.ulm_card_breezer_entity_current_co2 ]]]"
+                  name: "CO2"
+                  type: line
+                  stroke_width: 4
+                  curve: 'smooth'
+                  yaxis_id: co2
+                  color_threshold:
+                    - value: 0
+                      color: 'green'
+                    - value: 800
+                      color: 'green'
+                    - value: 1000
+                      color: 'orange'
+                    - value: 1200
+                      color: 'red'
+                  group_by:
+                    duration: 15min
+                    func: avg
+                    fill: last
+                - entity: "[[[ return variables.ulm_card_breezer_entity_fan_speed ]]]"
+                  name: "Fan Speed"
+                  type: area
+                  color: "dodgerblue"
+                  opacity: 0.25
+                  stroke_width: 0
+                  curve: 'stepline'
+                  yaxis_id: speed
+                  group_by:
+                    duration: 15min
+                    func: avg
+                    fill: last
+                - entity: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+                  name: "Target CO2"
+                  type: line
+                  color: "orange"
+                  stroke_width: 1
+                  curve: 'stepline'
+                  yaxis_id: co2
+                  group_by:
+                    duration: 15min
+                    func: avg
+                    fill: last
+                # - entity: "[[[ return variables.ulm_card_breezer_entity_target_co2 ]]]"
+                #   name: "Target CO2"
+                #   type: line
+                #   color: "orange"
+                #   stroke_width: 1
+                #   curve: 'straight'
+                #   yaxis_id: co2
+                #   data_generator: |
+                #     const value = Number(entity.state);
+                #     if (!Number.isFinite(value)) {
+                #       return [];
+                #     }
+                #     const now = new Date().getTime();
+                #     const span = 24 * 60 * 60 * 1000;
+                #     return [
+                #       [now - span, value],
+                #       [now + 60 * 1000, value]
+                #     ];
+              card_mod:
+                style: |
+                  ha-card {
+                    border: none;
+                    border-radius: 0px;
+                    border-width: 0px;
+                    background: transparent;
+                    box-shadow: none;
+                  }
+
+
