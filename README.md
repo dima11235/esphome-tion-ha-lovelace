@@ -1,4 +1,4 @@
-﻿# Набор Tion Breezer для Home Assistant
+# Набор Tion Breezer для Home Assistant
 
 Репозиторий помогает быстро собрать единый интерфейс управления бризером Tion в Home Assistant: готовые пакеты ESPHome, карточка UI Lovelace Minimalist, попап и переводы.
 
