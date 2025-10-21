@@ -16,17 +16,28 @@
 1. **Получите файлы.** Клонируйте репозиторий или скачайте архив с GitHub.
 2. **Подключите пакеты ESPHome.** В конфигурации вашего устройства добавьте нужные пакеты и укажите датчик CO₂ из Home Assistant:
    ```yaml
-   # пример секции packages в конфигурации ESPHome
-   substitutions:
-     auto_mode_co2_sensor: sensor.living_room_co2
+    # пример секции packages в конфигурации ESPHome
+    substitutions:
+      # Добавьте данную подстановку с указанием имени сенсора CO2 в раздел substitutions
+      auto_mode_co2_sensor: sensor.living_room_co2
 
-   packages:
-     tion_auto_mode:
-       url: https://github.com/dima11235/esphome-tion-ha-lovelace
-       files:
-         - esphome/tion_auto_mode.yaml
-         - esphome/tion_set_fan_speed.yaml
-         - esphome/tion_others.yaml
+    packages:
+      # Добавьте данный пакет в раздел packages
+      tion_auto_mode:
+        url: https://github.com/dima11235/esphome-tion-ha-lovelace
+        ref: main
+        refresh: 0s
+        files:
+          - esphome/tion_auto_mode.yaml
+          - esphome/tion_set_fan_speed.yaml
+          - esphome/tion_others.yaml
+
+    climate:
+      - platform: tion
+        id: tion_climate
+        name: None # задайте здесь значение None, чтобы работали автоподстановки в каточке
+        enable_heat_cool: True
+        enable_fan_auto: False
    ```
 3. **Скопируйте карточку.** Перенесите каталог `ui_lovelace_minimalist/custom_cards/custom_card_dko_tion_breezer/` в `<config>/ui_lovelace_minimalist/custom_cards/`. Создайте папку `custom_cards`, если её нет. Перезапустите UI Lovelace Minimalist или Home Assistant, если шаблон не появился сразу.
 4. **Добавьте карточку в дашборд.** После перезапуска UI Lovelace Minimalist или Home Assistant добавьте карточку на страницу:
