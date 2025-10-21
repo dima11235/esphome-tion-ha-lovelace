@@ -1,6 +1,6 @@
 # Набор Tion Breezer для Home Assistant
 
-Репозиторий даёт готовые ESPHome-пакеты и карточку UI Lovelace Minimalist для управления бризером Tion в Home Assistant.
+Репозиторий даёт готовые ESPHome-пакеты и карточку UI Lovelace Minimalist (ULM) для управления бризером Tion в Home Assistant.
 
 ## Что внутри
 - `esphome/` — набор конфигураций ESPHome.
@@ -8,7 +8,7 @@
 
 ## Требования
 - Home Assistant.
-- Компонент ESPHome для бризеров Tion (проверено с [dentra/esphome-tion](https://github.com/dentra/esphome-tion)).
+- Компонент ESPHome для бризеров Tion - см. [dentra/esphome-tion](https://github.com/dentra/esphome-tion).
 - UI Lovelace Minimalist — см. [инструкцию по установке](https://ui-lovelace-minimalist.github.io/UI/setup/installation/).
 - Карточки `custom:button-card`, `browser_mod`, `custom:apexcharts-card`.
 
@@ -46,11 +46,11 @@
        ulm_card_breezer_enable_controls: true
        ulm_card_breezer_enable_popup: true  # требуется browser_mod
    ```
-   Карточка автоматически подставляет идентификаторы вспомогательных сущностей, используя префикс из имени `climate`. Если у вас другое именование в ESPHome, задайте переменные явно (см. начало `custom_card_dko_tion_breezer.yaml`).
+   Карточка автоматически подставляет идентификаторы вспомогательных сущностей, используя префикс из имени `climate.` устройства. Если у вас другое именование в ESPHome, задайте переменные явно (см. начало `custom_card_dko_tion_breezer.yaml`).
 5. **(Опционально) Подключите попап.** Держите рядом файл `custom_card_dko_popup_tion_breezer.yaml` и оставьте переменную `ulm_card_breezer_enable_popup: true`. Попап показывает питание, нагрев, целевой CO₂, границы скорости и график за 24 часа (нужен `custom:apexcharts-card`).
 
 ## Сущности и сервисы, которые использует карточка
-Карточка ищет сущности по шаблону `climate.<имя>` → `<имя>_…`. Нужны:
+Карточка ищет сущности по шаблону `climate.<имя>`. Нужны:
 - `switch.<имя>_power_mode`, `_heater_mode`, `_silent_mode`, `_recirculation`.
 - `select.<имя>_air_intake` (если компонент его создаёт; иначе используется `switch.<имя>_recirculation`).
 - `number.<имя>_target_co2`, `_min_fan_speed`, `_max_fan_speed`, `_heater_temperature`.
