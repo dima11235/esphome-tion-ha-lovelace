@@ -1,28 +1,32 @@
-# custom_card_dko_tion_breezer
+# card_dko_tion_breezer
 
-Minimalist UI card for Tion breezer devices. The template expects a `climate` entity created by the ESPHome packages in this repository and automatically derives helper entity IDs (`switch`, `number`, `sensor`, etc.) by stripping the `climate.` prefix.
+Карточка UI Lovelace Minimalist для управления бризерами Tion. Шаблон ожидает сущность `climate`, созданную ESPHome-пакетами из этого репозитория, и автоматически подставляет идентификаторы вспомогательных сущностей (`switch`, `number`, `sensor` и т. д.), отбрасывая префикс `climate.`.
 
-## Installation
-1. Copy this folder (`custom_card_dko_tion_breezer/`) into the directory that UI Lovelace Minimalist scans for custom cards (typically `<config>/ui_lovelace_minimalist/custom_cards/`).
-2. Reload UI Lovelace Minimalist (or restart Home Assistant) so the new template is discovered.
+## Требования
+- UI Lovelace Minimalist;
+- `custom:button-card`;
+- `browser_mod` (когда используется всплывающее окно);
+- `custom:apexcharts-card` для графика в попапе;
+- ESPHome-настройка бризера на основе [dentra/esphome-tion](https://github.com/dentra/esphome-tion) с пакетами из каталога `esphome/`.
 
-## Usage
+## Установка
+1. Скопируйте папку `custom_card_dko_tion_breezer/` в `<config>/ui_lovelace_minimalist/custom_cards/`. Создайте каталог `custom_cards`, если его ещё нет.
+2. Перезагрузите UI Lovelace Minimalist (или перезапустите Home Assistant), чтобы шаблон подхватился.
+
+## Использование
 ```yaml
 - type: "custom:button-card"
   template: "card_dko_tion_breezer"
-  entity: climate.tion_bedroom
+  entity: climate.tion_breezer
   variables:
     ulm_card_breezer_enable_controls: true
-    ulm_card_breezer_enable_popup: true
+    ulm_card_breezer_enable_popup: true  # требуется browser_mod
 ```
 
-If you use a different entity naming scheme, override the variables explicitly (see the top of `custom_card_dko_tion_breezer.yaml` for the full list).
+Если климатическая сущность называется иначе, укажите нужные идентификаторы вручную — их список приведён в верхней части `custom_card_dko_tion_breezer.yaml`. Карточка поддерживает переключатели режимов (`switch.*`), селекторы (`select.*`), числовые входы (`number.*`), сенсоры (`sensor.*`) и сервис `esphome.<имя>_set_fan_speed`, созданные конфигурацией ESPHome.
 
-## Dependencies
-- UI Lovelace Minimalist (core templates + translation engine).
-- `custom:button-card`
-- `browser_mod` (needed when `ulm_card_breezer_enable_popup: true`).
-- `custom:apexcharts-card` for the historical chart in the popup.
+## Всплывающее окно
+Опциональный попап описан в `custom_card_dko_popup_tion_breezer.yaml`. Включите его, передав `ulm_card_breezer_enable_popup: true`. Попап отображает краткий обзор режимов, показатели CO₂ и историю за последние 24 часа (график строится через `custom:apexcharts-card`).
 
-## Translations
-Localization files live in `languages/`. Create additional `<LANG>.yaml` files following the same structure when you add new languages.
+## Локализация
+Переводы лежат в каталоге `languages/`. Добавляйте новые файлы `<lang>.yaml`, повторяя структуру существующих переводов.
