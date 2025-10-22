@@ -29,13 +29,26 @@
           - esphome/tion_set_fan_speed.yaml
           - esphome/tion_others.yaml
 
-    climate:
+   climate:
       - platform: tion
         id: tion_climate
         name: None
         enable_heat_cool: True
         enable_fan_auto: False
    ```
+   Карточка совместима со стандартными сущностями `esphome-tion`: `climate`, `switch`, `number`, `sensor` и т.д. Единственное дополнение — сервис `esphome.<имя>_set_fan_speed` для задания диапазона скоростей. Его добавляет минимальный пакет `esphome/tion_set_fan_speed.yaml`, подключённый в раздел `packages`.
+
+   **Минимальный пример конфигурации.** Если используются сущности автоматического управлению скоростью из пакета [dentra/esphome-tion](https://github.com/dentra/esphome-tion):
+   ```yaml
+    packages:
+      tion_auto_mode:
+        url: https://github.com/dima11235/esphome-tion-ha-lovelace
+        ref: main
+        refresh: 0s
+        files:
+          - esphome/tion_set_fan_speed.yaml
+   ```
+   Такой конфигурации достаточно, чтобы карточка работала, а сервис `esphome.<имя>_set_fan_speed` позволял задавать диапазон скоростей из интерфейса.
 3. **Скопируйте карточку.** Перенесите каталог `ui_lovelace_minimalist/custom_cards/custom_card_dko_tion_breezer/` в `<config>/ui_lovelace_minimalist/custom_cards/`. Создайте папку `custom_cards`, если её нет. Перезапустите UI Lovelace Minimalist или Home Assistant, если шаблон не появился сразу.
 4. **Добавьте карточку в дашборд.** После перезапуска UI Lovelace Minimalist или Home Assistant добавьте карточку на страницу:
    ```yaml
