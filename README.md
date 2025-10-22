@@ -36,7 +36,7 @@
         enable_heat_cool: True
         enable_fan_auto: False
    ```
-   Карточка совместима со стандартными сущностями `esphome-tion`: `climate`, `switch`, `number`, `sensor` и т.д. Единственное дополнение — сервис `esphome.<имя>_set_fan_speed` для задания диапазона скоростей. Его добавляет минимальный пакет `esphome/tion_set_fan_speed.yaml`, подключённый в раздел `packages`.
+   Карточка может быть совместима со стандартными сущностями `esphome-tion` (`climate`, `switch`, `number`, `sensor` и т.д.), однако такой вариант пока не тестировался. Единственное дополнение — сервис `esphome.<имя>_set_fan_speed` для задания диапазона скоростей. Его добавляет минимальный пакет `esphome/tion_set_fan_speed.yaml`, подключённый в раздел `packages`.
 
    **Минимальный пример конфигурации.** Если используются сущности автоматического управлению скоростью из пакета [dentra/esphome-tion](https://github.com/dentra/esphome-tion):
    ```yaml
