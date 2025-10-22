@@ -48,7 +48,7 @@
         files:
           - esphome/tion_set_fan_speed.yaml
    ```
-   Такой конфигурации достаточно, чтобы карточка работала, а сервис `esphome.<имя>_set_fan_speed` позволял задавать диапазон скоростей из интерфейса.
+   Такой конфигурации может быть достаточно (не тестировалось), чтобы карточка работала, а сервис `esphome.<имя>_set_fan_speed` позволял задавать диапазон скоростей из интерфейса.
 3. **Скопируйте карточку.** Перенесите каталог `ui_lovelace_minimalist/custom_cards/custom_card_dko_tion_breezer/` в `<config>/ui_lovelace_minimalist/custom_cards/`. Создайте папку `custom_cards`, если её нет. Перезапустите UI Lovelace Minimalist или Home Assistant, если шаблон не появился сразу.
 4. **Добавьте карточку в дашборд.** После перезапуска UI Lovelace Minimalist или Home Assistant добавьте карточку на страницу:
    ```yaml
