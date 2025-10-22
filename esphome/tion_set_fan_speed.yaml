@@ -1,4 +1,22 @@
+# Расширение конфигурации ESPHome для бризера Tion (https://github.com/dentra/esphome-tion)
+#
+# substitutions:
+#   # Добавьте подстановку с именем сенсора CO₂ в раздел substitutions
+#   auto_mode_co2_sensor: sensor.living_room_co2
+#
+# packages:
+#   # Добавьте данный пакет в раздел packages
+#   tion_auto_mode:
+#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
+#     ref: main
+#     files:
+#       - esphome/tion_auto_mode.yaml        # Автоматическое управление скоростью по уровню CO₂
+#       - esphome/tion_set_fan_speed.yaml    # Сервис Home Assistant для задания диапазона скоростей
+#       - esphome/tion_others.yaml           # Дополнительные сенсоры и текстовые поля (по желанию)
+
 ### ESPHome package: helper services for manual fan speed control
+
+# Глобальные переменные: предыдущий режим и таймер ожидания второго вызова
 
 globals:
   - id: last_mode
@@ -11,17 +29,18 @@ globals:
     restore_value: no
     initial_value: '0'
 
+# Сервис Home Assistant: первый вызов фиксирует начальную скорость, второй задаёт диапазон
 api:
   services:
     - service: set_fan_speed
       variables:
         fan_speed: int
       then:
-        - if:
+        - if:  # Проверяем, что скорость лежит в диапазоне 0–6
             condition:
               lambda: 'return fan_speed >= 0 && fan_speed <= 6;'
             then:
-              - if:
+              - if:  # Первый вызов — запоминаем скорость и ждём второй
                   condition:
                     lambda: 'return id(mode_timer) == 0;'
                   then:
@@ -36,7 +55,7 @@ api:
                         id: min_fan_speed
                         value: !lambda 'return fan_speed;'
                     - globals.set: { id: mode_timer, value: "1" }
-                  else:
+                  else:  # Второй вызов — выставляем диапазон min/max и сбрасываем таймер
                     - logger.log: "tion_set_fan_speed: Second set_fan_speed call detected, setting range"
                     - number.set:
                         id: min_fan_speed
@@ -45,15 +64,16 @@ api:
                         id: max_fan_speed
                         value: !lambda 'return std::max<int>(static_cast<int>(id(last_mode)), static_cast<int>(fan_speed));'
                     - globals.set: { id: mode_timer, value: "0" }
-              - logger.log:
+              - logger.log:  # Успешно приняли команду от Home Assistant
                   format: "Fan speed set to %d"
                   args: [ 'fan_speed' ]
             else:
-              - logger.log:
+              - logger.log:  # Ошибка диапазона — пишем в лог
                   level: ERROR
                   format: "Invalid fan speed value: %d"
                   args: [ 'fan_speed' ]
 
+# Интервал 1 с: ждём второй вызов, иначе оставляем фиксированную скорость
 interval:
   - interval: 1s
     id: mode_timeout
@@ -62,15 +82,15 @@ interval:
           condition:
             lambda: 'return id(mode_timer) > 0;'
           then:
-            - globals.set:
+            - globals.set:  # Увеличиваем таймер ожидания
                 id: mode_timer
                 value: !lambda 'return id(mode_timer) + 1;'
-            - if:
+            - if:  # Если второй вызов так и не пришёл — сбрасываем таймер
                 condition:
                   lambda: 'return id(mode_timer) >= 4;'
                 then:
                   - logger.log: "tion_set_fan_speed: No second set_fan_speed call, keep fixed speed"
                   - globals.set: { id: mode_timer, value: "0" }
-            - logger.log:
+            - logger.log:  # Диагностика: текущее значение таймера
                 format: "Timer set to %d"
                 args: [ 'id(mode_timer)' ]

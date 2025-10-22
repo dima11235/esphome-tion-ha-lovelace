@@ -1,4 +1,22 @@
+# Расширение конфигурации ESPHome для бризера Tion (https://github.com/dentra/esphome-tion)
+#
+# substitutions:
+#   # Добавьте подстановку с именем сенсора CO₂ в раздел substitutions
+#   auto_mode_co2_sensor: sensor.living_room_co2
+#
+# packages:
+#   # Добавьте данный пакет в раздел packages
+#   tion_auto_mode:
+#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
+#     ref: main
+#     files:
+#       - esphome/tion_auto_mode.yaml        # Автоматическое управление скоростью по уровню CO₂
+#       - esphome/tion_set_fan_speed.yaml    # Сервис Home Assistant для задания диапазона скоростей
+#       - esphome/tion_others.yaml           # Дополнительные сенсоры и текстовые поля (по желанию)
+
 ### ESPHome package: Automatic fan control for Tion breezer (CO2 driven)
+
+# Глобальные переменные для синхронизации состояний и хранения последней скорости
 
 globals:
   - id: sync_timer
@@ -11,6 +29,7 @@ globals:
     restore_value: no
     initial_value: '-1'
 
+# Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
   - platform: tion
     name: "Fan Speed"
@@ -45,6 +64,7 @@ sensor:
     lambda: |-
       return id(target_co2).state;
 
+# PID-контроллер управляет скоростью бризера в автоматическом режиме
 climate:
   - platform: pid
     id: pid_co2
@@ -61,6 +81,7 @@ climate:
       min_integral: -0.167
       output_averaging_samples: 3
 
+# Применяем вычисленную PID скорость, учитывая Silent Mode и диапазон скоростей
 output:
   - platform: template
     id: output_fan_speed
@@ -88,6 +109,7 @@ output:
                         const int requested = static_cast<int>(std::lround(6.0f * state));
                         return std::max<int>(min_speed, std::min<int>(max_speed, requested));
 
+# Скрипт отправляет целевую скорость в климатическую сущность Tion
 script:
   - id: set_fan_speed
     parameters:
@@ -114,6 +136,7 @@ script:
                       mode: 'OFF'
             - globals.set: { id: internal_fan_speed, value: !lambda 'return fan_speed;' }
 
+# Переключатели управления питанием, режимами обогрева, авто и тихим режимами
 switch:
   - platform: template
     name: "Power Mode"
@@ -206,6 +229,7 @@ switch:
                 id: set_fan_speed
                 fan_speed: !lambda 'return id(min_fan_speed).state;'
 
+# Числовые сущности для задания целевого CO₂, температуры нагрева и допустимого диапазона скоростей
 number:
   - platform: template
     name: "Heater Temperature"
@@ -312,6 +336,7 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
 
+# Периодическая синхронизация состояний между ESPHome и Home Assistant
 interval:
   - interval: 1s
     id: sync_state
