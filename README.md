@@ -1,83 +1,113 @@
-# Набор Tion Breezer для Home Assistant
+# ESPHome-пакеты для бризеров Tion
 
-Репозиторий даёт готовые ESPHome-пакеты и карточку UI Lovelace Minimalist (ULM) для управления бризером Tion в Home Assistant.
+Готовые ESPHome-пакеты для управления бризером [Tion](https://tion.ru/) через Home Assistant.  
+Пакеты создают набор сущностей (`switch`, `number`, `sensor`), которые обеспечивают автоматическое управление скоростью по CO₂ и совместимы с [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card).
+
+---
+
+## Карточка для Lovelace
+
+Для отображения бризера в дашборде используйте **[tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card)** — отдельная кастомная карточка, устанавливается через HACS, не требует UI Lovelace Minimalist.
+
+---
 
 ## Что внутри
-- `esphome/` — набор конфигураций ESPHome.
-- `ui_lovelace_minimalist/custom_cards/` — карточка `custom_card_dko_tion_breezer` и попап для ULM.
+
+- `esphome/tion_auto_mode.yaml` — основной пакет: автоуправление скоростью по CO₂, все сущности для карточки.
+- `esphome/tion_set_fan_speed.yaml` — дополнительный пакет: сервис `esphome.<имя>_set_fan_speed` для задания диапазона скоростей из автоматизаций HA.
+- `esphome/tion_others.yaml` — опциональный пакет: диагностические сенсоры (Wi-Fi RSSI, BSSID).
+
+---
 
 ## Требования
+
 - Home Assistant.
-- Компонент ESPHome для бризеров Tion - см. [dentra/esphome-tion](https://github.com/dentra/esphome-tion).
-- UI Lovelace Minimalist — см. [инструкцию по установке](https://ui-lovelace-minimalist.github.io/UI/setup/installation/).
-- Карточки `custom:button-card`, `browser_mod`, `custom:apexcharts-card`.
+- ESPHome-интеграция для бризеров Tion — [dentra/esphome-tion](https://github.com/dentra/esphome-tion).
 
-## Установка и настройка
-1. **Получите файлы.** Клонируйте репозиторий или скачайте архив с GitHub.
-2. **Подключите пакеты ESPHome.** В конфигурации устройства добавьте сенсор CO₂ и подключите пакеты (пример ниже):
-   ```yaml
-    substitutions:
-      auto_mode_co2_sensor: sensor.living_room_co2
+---
 
-    packages:
-      tion_auto_mode:
-        url: https://github.com/dima11235/esphome-tion-ha-lovelace
-        ref: main
-        refresh: 0s
-        files:
-          - esphome/tion_auto_mode.yaml
-          - esphome/tion_set_fan_speed.yaml
-          - esphome/tion_others.yaml
+## Установка
 
-   climate:
-      - platform: tion
-        id: tion_climate
-        name: None
-        enable_heat_cool: True
-        enable_fan_auto: False
-   ```
-   Карточка может быть совместима со стандартными сущностями `esphome-tion` (`climate`, `switch`, `number`, `sensor` и т.д.), однако такой вариант пока не тестировался. Единственное дополнение — сервис `esphome.<имя>_set_fan_speed` для задания диапазона скоростей. Его добавляет минимальный пакет `esphome/tion_set_fan_speed.yaml`, подключённый в раздел `packages`.
+### Минимальный вариант
 
-   **Минимальный пример конфигурации.** Если используются сущности автоматического управлению скоростью из пакета [dentra/esphome-tion](https://github.com/dentra/esphome-tion):
-   ```yaml
-    packages:
-      tion_auto_mode:
-        url: https://github.com/dima11235/esphome-tion-ha-lovelace
-        ref: main
-        refresh: 0s
-        files:
-          - esphome/tion_set_fan_speed.yaml
-   ```
-   Такой конфигурации может быть достаточно (не тестировалось), чтобы карточка работала, а сервис `esphome.<имя>_set_fan_speed` позволял задавать диапазон скоростей из интерфейса.
-3. **Скопируйте карточку.** Перенесите каталог `ui_lovelace_minimalist/custom_cards/custom_card_dko_tion_breezer/` в `<config>/ui_lovelace_minimalist/custom_cards/`. Создайте папку `custom_cards`, если её нет. Перезапустите UI Lovelace Minimalist или Home Assistant, если шаблон не появился сразу.
-4. **Добавьте карточку в дашборд.** После перезапуска UI Lovelace Minimalist или Home Assistant добавьте карточку на страницу:
-   ```yaml
-   - type: "custom:button-card"
-     template: "card_dko_tion_breezer"
-     entity: climate.tion_breezer
-     variables:
-       ulm_card_breezer_enable_controls: true
-       ulm_card_breezer_enable_popup: true  # требуется browser_mod
-   ```
-   Карточка автоматически подставляет идентификаторы вспомогательных сущностей, используя префикс из имени `climate.` устройства. Если у вас другое именование в ESPHome, задайте переменные явно (см. начало `custom_card_dko_tion_breezer.yaml`).
-5. **(Опционально) Подключите попап.** Держите рядом файл `custom_card_dko_popup_tion_breezer.yaml` и оставьте переменную `ulm_card_breezer_enable_popup: true`. Попап показывает питание, нагрев, целевой CO₂, границы скорости и график за 24 часа (нужен `custom:apexcharts-card`).
+Если у вас уже есть `climate`, `switch`, `number` и `sensor`-сущности от [dentra/esphome-tion](https://github.com/dentra/esphome-tion), подключите только пакет `tion_auto_mode.yaml`:
 
-## Сущности и сервисы, которые использует карточка
-Карточка ищет сущности по шаблону `climate.<имя>`. Нужны:
-- `switch.<имя>_power_mode`, `_heater_mode`, `_silent_mode`, `_recirculation`.
-- `select.<имя>_air_intake` (если компонент его создаёт; иначе используется `switch.<имя>_recirculation`).
-- `number.<имя>_target_co2`, `_min_fan_speed`, `_max_fan_speed`, `_heater_temperature`.
-- `sensor.<имя>_current_co2`, `_fan_speed`, `_outdoor_temperature`.
-- Сервис `esphome.<имя>_set_fan_speed`.
+```yaml
+substitutions:
+  auto_mode_co2_sensor: sensor.living_room_co2  # ваш сенсор CO₂
 
-При другом именовании переопределите переменные в конфигурации карточки.
+packages:
+  tion_auto_mode:
+    url: https://github.com/dima11235/esphome-tion-ha-lovelace
+    ref: main
+    refresh: 0s
+    files:
+      - esphome/tion_auto_mode.yaml
 
-## Предпросмотр
-![Полный вид карточки](images/big.jpg)
-![Компактный вид карточки](images/small.jpg)
+climate:
+  - platform: tion
+    id: tion_climate
+    name: None
+    enable_heat_cool: true
+    enable_fan_auto: false
+```
 
-## Локализация
-Готовые строки лежат в `languages/` (русский и английский). Чтобы добавить язык, создайте файл `<lang>.yaml` по аналогии с существующими.
+### Полный вариант
+
+```yaml
+substitutions:
+  auto_mode_co2_sensor: sensor.living_room_co2
+
+packages:
+  tion_auto_mode:
+    url: https://github.com/dima11235/esphome-tion-ha-lovelace
+    ref: main
+    refresh: 0s
+    files:
+      - esphome/tion_auto_mode.yaml      # Авторегулировка скорости по CO₂
+      - esphome/tion_set_fan_speed.yaml  # Сервис для автоматизаций HA (опционально)
+      - esphome/tion_others.yaml         # Wi-Fi диагностика (опционально)
+
+climate:
+  - platform: tion
+    id: tion_climate
+    name: None
+    enable_heat_cool: true
+    enable_fan_auto: false
+```
+
+---
+
+## Сущности, которые создаёт `tion_auto_mode.yaml`
+
+Все сущности именуются по схеме `<domain>.<device_name>_<suffix>`, где `<device_name>` — имя устройства ESPHome.
+
+| Сущность | Описание |
+|---|---|
+| `switch.<имя>_power_mode` | Питание бризера |
+| `switch.<имя>_heater_mode` | Режим нагрева |
+| `switch.<имя>_silent_mode` | Тихий режим (фиксирует скорость 1) |
+| `number.<имя>_heater_temperature` | Целевая температура нагрева |
+| `number.<имя>_target_co2` | Целевой уровень CO₂ |
+| `number.<имя>_min_fan_speed` | Минимальная скорость диапазона |
+| `number.<имя>_max_fan_speed` | Максимальная скорость диапазона |
+| `sensor.<имя>_fan_speed` | Текущая скорость вентилятора |
+| `sensor.<имя>_current_co2` | Текущий уровень CO₂ |
+
+---
+
+## Сервис `tion_set_fan_speed.yaml`
+
+Пакет добавляет сервис `esphome.<имя>_set_fan_speed`. Используется для задания диапазона скоростей из автоматизаций Home Assistant:
+
+- Первый вызов — фиксирует начальную скорость.
+- Второй вызов в течение ~3 с — задаёт диапазон `[min, max]`.
+- Если второй вызов не поступил — скорость остаётся фиксированной.
+
+> **Карточке [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card) этот сервис не нужен** — она устанавливает `min_fan_speed` и `max_fan_speed` напрямую через `number.set_value`.
+
+---
 
 ## Лицензия
-MIT, текст — в [`LICENSE`](LICENSE).
+
+MIT — см. [`LICENSE`](LICENSE).
