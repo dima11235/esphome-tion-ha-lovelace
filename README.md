@@ -1,40 +1,42 @@
 # ESPHome-пакеты для бризеров Tion
 
 Готовые ESPHome-пакеты для управления бризером [Tion](https://tion.ru/) через Home Assistant.  
-Пакеты создают набор сущностей (`switch`, `number`, `sensor`), которые обеспечивают автоматическое управление скоростью по CO₂ и совместимы с [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card).
+Пакеты создают сущности (`switch`, `number`, `sensor`), с которыми работает **[tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card)**.
 
 ---
 
-## Карточка для Lovelace
+## Как это работает
 
-Для отображения бризера в дашборде используйте **[tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card)** — отдельная кастомная карточка, устанавливается через HACS, не требует UI Lovelace Minimalist.
+```
+dentra/esphome-tion          → climate.brizer_bedroom
+esphome-tion-ha-lovelace     → switch/number/sensor.*_power_mode, *_heater_mode, …
+tion-breezer-tile-card       → читает все эти сущности и управляет ими
+```
 
----
-
-## Что внутри
-
-- `esphome/tion_auto_mode.yaml` — основной пакет: автоуправление скоростью по CO₂, все сущности для карточки.
-- `esphome/tion_set_fan_speed.yaml` — дополнительный пакет: сервис `esphome.<имя>_set_fan_speed` для задания диапазона скоростей из автоматизаций HA.
-- `esphome/tion_others.yaml` — опциональный пакет: диагностические сенсоры (Wi-Fi RSSI, BSSID).
+[dentra/esphome-tion](https://github.com/dentra/esphome-tion) создаёт климатическую сущность (`climate.<имя>`).  
+Пакеты из этого репозитория добавляют вспомогательные сущности поверх неё — автоматику по CO₂, переключатели режимов, числовые настройки.  
+Карточка [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card) автоматически выводит идентификаторы всех сущностей из имени `climate.<имя>` и предоставляет готовый интерфейс управления.
 
 ---
 
 ## Требования
 
-- Home Assistant.
-- ESPHome-интеграция для бризеров Tion — [dentra/esphome-tion](https://github.com/dentra/esphome-tion).
+- [dentra/esphome-tion](https://github.com/dentra/esphome-tion) — ESPHome-компонент для бризеров Tion.
+- [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card) — кастомная карточка для Lovelace (устанавливается через HACS).
+- Внешний сенсор CO₂ в Home Assistant (если используется `tion_auto_mode.yaml`).
 
 ---
 
-## Установка
+## Быстрый старт
 
-### Минимальный вариант
-
-Если у вас уже есть `climate`, `switch`, `number` и `sensor`-сущности от [dentra/esphome-tion](https://github.com/dentra/esphome-tion), подключите только пакет `tion_auto_mode.yaml`:
+### 1. ESPHome-конфигурация
 
 ```yaml
+esphome:
+  name: brizer_bedroom   # имя устройства → префикс всех сущностей
+
 substitutions:
-  auto_mode_co2_sensor: sensor.living_room_co2  # ваш сенсор CO₂
+  auto_mode_co2_sensor: sensor.living_room_co2  # ваш сенсор CO₂ в HA
 
 packages:
   tion_auto_mode:
@@ -44,6 +46,7 @@ packages:
     files:
       - esphome/tion_auto_mode.yaml
 
+# Климат настраивается через dentra/esphome-tion:
 climate:
   - platform: tion
     id: tion_climate
@@ -52,59 +55,61 @@ climate:
     enable_fan_auto: false
 ```
 
-### Полный вариант
+После прошивки в HA появятся сущности вида `switch.brizer_bedroom_power_mode`, `sensor.brizer_bedroom_fan_speed` и т. д.
+
+### 2. Карточка в Lovelace
+
+Установите [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card) через HACS, затем добавьте карточку:
 
 ```yaml
-substitutions:
-  auto_mode_co2_sensor: sensor.living_room_co2
-
-packages:
-  tion_auto_mode:
-    url: https://github.com/dima11235/esphome-tion-ha-lovelace
-    ref: main
-    refresh: 0s
-    files:
-      - esphome/tion_auto_mode.yaml      # Авторегулировка скорости по CO₂
-      - esphome/tion_set_fan_speed.yaml  # Сервис для автоматизаций HA (опционально)
-      - esphome/tion_others.yaml         # Wi-Fi диагностика (опционально)
-
-climate:
-  - platform: tion
-    id: tion_climate
-    name: None
-    enable_heat_cool: true
-    enable_fan_auto: false
+type: custom:tion-breezer-tile-card
+entity: climate.brizer_bedroom
 ```
 
+Карточка автоматически найдёт все вспомогательные сущности по префиксу `brizer_bedroom`.
+
 ---
 
-## Сущности, которые создаёт `tion_auto_mode.yaml`
+## Схема именования сущностей
 
-Все сущности именуются по схеме `<domain>.<device_name>_<suffix>`, где `<device_name>` — имя устройства ESPHome.
+Имя устройства ESPHome (`esphome: name:`) становится префиксом всех сущностей.  
+Карточка выводит их автоматически из `climate.<prefix>`:
 
-| Сущность | Описание |
+| Сущность в HA | Что делает |
 |---|---|
-| `switch.<имя>_power_mode` | Питание бризера |
-| `switch.<имя>_heater_mode` | Режим нагрева |
-| `switch.<имя>_silent_mode` | Тихий режим (фиксирует скорость 1) |
-| `number.<имя>_heater_temperature` | Целевая температура нагрева |
-| `number.<имя>_target_co2` | Целевой уровень CO₂ |
-| `number.<имя>_min_fan_speed` | Минимальная скорость диапазона |
-| `number.<имя>_max_fan_speed` | Максимальная скорость диапазона |
-| `sensor.<имя>_fan_speed` | Текущая скорость вентилятора |
-| `sensor.<имя>_current_co2` | Текущий уровень CO₂ |
+| `climate.<prefix>` | Климат бризера (от dentra/esphome-tion) |
+| `switch.<prefix>_power_mode` | Включение / выключение |
+| `switch.<prefix>_heater_mode` | Режим нагрева |
+| `switch.<prefix>_silent_mode` | Тихий режим (фиксирует скорость 1) |
+| `number.<prefix>_heater_temperature` | Целевая температура нагрева, °C |
+| `number.<prefix>_target_co2` | Целевой уровень CO₂, ppm |
+| `number.<prefix>_min_fan_speed` | Нижняя граница скорости (0–6) |
+| `number.<prefix>_max_fan_speed` | Верхняя граница скорости (0–6) |
+| `sensor.<prefix>_fan_speed` | Текущая скорость вентилятора |
+| `sensor.<prefix>_current_co2` | Текущий CO₂ (зеркало внешнего сенсора) |
 
 ---
 
-## Сервис `tion_set_fan_speed.yaml`
+## Пакеты
 
-Пакет добавляет сервис `esphome.<имя>_set_fan_speed`. Используется для задания диапазона скоростей из автоматизаций Home Assistant:
+### `tion_auto_mode.yaml` — основной
 
-- Первый вызов — фиксирует начальную скорость.
-- Второй вызов в течение ~3 с — задаёт диапазон `[min, max]`.
-- Если второй вызов не поступил — скорость остаётся фиксированной.
+Реализует PID-регулятор скорости по CO₂ и создаёт все сущности из таблицы выше.  
+Требует `substitutions.auto_mode_co2_sensor` — entity_id сенсора CO₂ в HA.
 
-> **Карточке [tion-breezer-tile-card](https://github.com/dima11235/tion-breezer-tile-card) этот сервис не нужен** — она устанавливает `min_fan_speed` и `max_fan_speed` напрямую через `number.set_value`.
+### `tion_set_fan_speed.yaml` — сервис для автоматизаций *(опционально)*
+
+Добавляет сервис `esphome.<имя>_set_fan_speed` для управления диапазоном скоростей из автоматизаций Home Assistant:
+
+- первый вызов — запоминает скорость;
+- второй вызов в течение ~3 с — задаёт диапазон `[min, max]`;
+- если второй вызов не поступил — скорость остаётся фиксированной.
+
+> **Карточке tion-breezer-tile-card этот сервис не нужен** — она устанавливает `min_fan_speed` и `max_fan_speed` напрямую через `number.set_value`.
+
+### `tion_others.yaml` — диагностика *(опционально)*
+
+Добавляет сенсоры Wi-Fi RSSI и BSSID.
 
 ---
 
