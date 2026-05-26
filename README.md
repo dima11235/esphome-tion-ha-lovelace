@@ -111,8 +111,4 @@ entity: climate.brizer_bedroom
 
 Добавляет сенсоры Wi-Fi RSSI и BSSID.
 
----
 
-## Лицензия
-
-MIT.
