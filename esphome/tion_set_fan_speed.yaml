@@ -1,18 +1,11 @@
-# Расширение конфигурации ESPHome для бризера Tion (https://github.com/dentra/esphome-tion)
+# ESPHome-пакет для бризера Tion (https://github.com/dentra/esphome-tion)
+# Репозиторий: https://github.com/dima11235/esphome-tion-ha-lovelace
 #
-# substitutions:
-#   # Добавьте подстановку с именем сенсора CO₂ в раздел substitutions
-#   auto_mode_co2_sensor: sensor.living_room_co2
+# Опциональный пакет: добавляет сервис esphome.<имя>_set_fan_speed для автоматизаций HA.
+# Карточке tion-breezer-tile-card этот пакет не нужен.
 #
-# packages:
-#   # Добавьте данный пакет в раздел packages
-#   tion_auto_mode:
-#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
-#     ref: main
-#     files:
-#       - esphome/tion_auto_mode.yaml        # Автоматическое управление скоростью по уровню CO₂
-#       - esphome/tion_set_fan_speed.yaml    # Сервис Home Assistant для задания диапазона скоростей
-#       - esphome/tion_others.yaml           # Дополнительные сенсоры и текстовые поля (по желанию)
+# Подключение (добавить к списку files в пакете tion_auto_mode):
+#       - esphome/tion_set_fan_speed.yaml
 
 ### ESPHome package: helper services for manual fan speed control
 
@@ -64,9 +57,9 @@ api:
                         id: max_fan_speed
                         value: !lambda 'return std::max<int>(static_cast<int>(id(last_mode)), static_cast<int>(fan_speed));'
                     - globals.set: { id: mode_timer, value: "0" }
-              - logger.log:  # Успешно приняли команду от Home Assistant
-                  format: "Fan speed set to %d"
-                  args: [ 'fan_speed' ]
+                    - logger.log:
+                        format: "tion_set_fan_speed: range set to [%d, %d]"
+                        args: [ 'static_cast<int>(id(min_fan_speed).state)', 'static_cast<int>(id(max_fan_speed).state)' ]
             else:
               - logger.log:  # Ошибка диапазона — пишем в лог
                   level: ERROR

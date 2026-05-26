@@ -115,4 +115,4 @@ entity: climate.brizer_bedroom
 
 ## Лицензия
 
-MIT — см. [`LICENSE`](LICENSE).
+MIT.

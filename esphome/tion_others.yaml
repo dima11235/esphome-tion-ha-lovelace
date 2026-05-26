@@ -1,18 +1,10 @@
-# Расширение конфигурации ESPHome для бризера Tion (https://github.com/dentra/esphome-tion)
+# ESPHome-пакет для бризера Tion (https://github.com/dentra/esphome-tion)
+# Репозиторий: https://github.com/dima11235/esphome-tion-ha-lovelace
 #
-# substitutions:
-#   # Добавьте подстановку с именем сенсора CO₂ в раздел substitutions
-#   auto_mode_co2_sensor: sensor.living_room_co2
+# Опциональный пакет: Wi-Fi диагностика (RSSI, BSSID).
 #
-# packages:
-#   # Добавьте данный пакет в раздел packages
-#   tion_auto_mode:
-#     url: https://github.com/dima11235/esphome-tion-ha-lovelace
-#     ref: main
-#     files:
-#       - esphome/tion_auto_mode.yaml        # Автоматическое управление скоростью по уровню CO₂
-#       - esphome/tion_set_fan_speed.yaml    # Сервис Home Assistant для задания диапазона скоростей
-#       - esphome/tion_others.yaml           # Дополнительные сенсоры и текстовые поля (по желанию)
+# Подключение (добавить к списку files в пакете tion_auto_mode):
+#       - esphome/tion_others.yaml
 
 ### ESPHome package: utility sensors and diagnostics for the breezer
 
