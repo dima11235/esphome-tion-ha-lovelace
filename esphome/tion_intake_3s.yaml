@@ -29,10 +29,6 @@ esphome:
           id: air_intake_target_open
           value: !lambda 'return id(tion_air_intake_current).current_option() == "outdoor";'
 
-# Немедленная запись глобалов во flash при изменении (иначе при перезагрузке состояние теряется)
-preferences:
-  flash_write_interval: 0s
-
 # Хранит целевое положение заслонки между перезагрузками
 globals:
   - id: air_intake_target_open
