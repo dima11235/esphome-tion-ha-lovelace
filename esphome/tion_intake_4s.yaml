@@ -6,26 +6,20 @@
 # Что делает:
 #   - Добавляет в HA переключатель switch.air_intake_target — желаемое положение заслонки
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
-#   - Переключатель хранит последнюю команду из HA и не откатывается назад,
-#     если устройство отклоняет команду или на короткое время меняет заслонку (скорость 0).
-#   - При скорости 0 — обновления от железа игнорируются, переключатель остаётся в
-#     желаемом состоянии (устройство закрывает заслонку автоматически).
-#   - При изменении переключателя из HA — сразу отправляет команду железу.
+#   - При команде из HA — не откатывается, даже если устройство отклоняет команду.
+#   - При изменении заслонки с пульта — переключатель обновляется вслед за железом.
 #   - Физический switch tion_recirculation_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
 #
-# Требует: esphome/tion_auto_mode.yaml (нужен sensor current_fan_speed)
-#
 # Подключение:
 #
 # packages:
-#   tion_auto_mode:
+#   tion_intake:
 #     url: https://github.com/dima11235/esphome-tion-ha-lovelace
 #     ref: main
 #     refresh: 0s
 #     files:
-#       - esphome/tion_auto_mode.yaml   # обязательно, нужен current_fan_speed
 #       - esphome/tion_intake_4s.yaml   # этот файл
 
 ### ESPHome package: Air intake control for Tion 4S (recirculation switch)
@@ -34,16 +28,16 @@
 #   recirculation ON  → воздух рециркулирует → заслонка ЗАКРЫТА (indoor)
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
 
-# Желаемое состояние заслонки — источник правды для переключателя в HA.
-# Обновляется только из turn_on/off_action, не из on_turn_on/off железа.
 globals:
-  - id: air_intake_target_open
+  # Флаг: мы только что отправили команду, следующий on_turn_on/off — ответ на неё, а не изменение с пульта
+  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов
+  - id: tion_intake_commanding
     type: bool
     restore_value: no
-    initial_value: 'true'
+    initial_value: 'false'
 
 switch:
-  # Физический switch рециркуляции — скрыт из HA, при изменении синхронизирует переключатель с желаемым состоянием (только при fan > 0)
+  # Физический switch рециркуляции — скрыт из HA
   - platform: tion
     id: tion_recirculation_current
     type: recirculation
@@ -51,23 +45,32 @@ switch:
     internal: true
     on_turn_on:
       - lambda: |-
-          if (int(id(current_fan_speed).state) > 0)
-            id(air_intake_target).publish_state(id(air_intake_target_open));
+          if (id(tion_intake_commanding)) {
+            // Ответ на нашу команду: switch уже в правильном оптимистичном состоянии
+            id(tion_intake_commanding) = false;
+          } else {
+            // Изменение с пульта: рециркуляция включилась → заслонка закрыта
+            id(air_intake_target).publish_state(false);
+          }
     on_turn_off:
       - lambda: |-
-          if (int(id(current_fan_speed).state) > 0)
-            id(air_intake_target).publish_state(id(air_intake_target_open));
+          if (id(tion_intake_commanding)) {
+            id(tion_intake_commanding) = false;
+          } else {
+            // Изменение с пульта: рециркуляция выключилась → заслонка открыта
+            id(air_intake_target).publish_state(true);
+          }
 
-  # Управляющий переключатель — виден в HA, отображает желаемое состояние заслонки
+  # Управляющий переключатель — виден в HA
   - platform: template
     name: "Air Intake Open"
     id: air_intake_target
     icon: "mdi:valve"
     turn_on_action:
-      - lambda: id(air_intake_target_open) = true;
+      - lambda: id(tion_intake_commanding) = true;
       - logger.log: "tion_intake_4s: target → open (recirculation OFF)"
       - switch.turn_off: tion_recirculation_current
     turn_off_action:
-      - lambda: id(air_intake_target_open) = false;
+      - lambda: id(tion_intake_commanding) = true;
       - logger.log: "tion_intake_4s: target → closed (recirculation ON)"
       - switch.turn_on: tion_recirculation_current

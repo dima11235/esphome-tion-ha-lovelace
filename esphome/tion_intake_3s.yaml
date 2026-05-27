@@ -6,39 +6,33 @@
 # Что делает:
 #   - Добавляет в HA переключатель switch.air_intake_target — желаемое положение заслонки
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
-#   - Переключатель хранит последнюю команду из HA и не откатывается назад,
-#     если устройство отклоняет команду или на короткое время меняет заслонку (скорость 0).
-#   - При скорости 0 — обновления от железа игнорируются, переключатель остаётся в
-#     желаемом состоянии (устройство закрывает заслонку автоматически).
-#   - При изменении переключателя из HA — сразу отправляет команду железу.
+#   - При команде из HA — не откатывается, даже если устройство отклоняет команду.
+#   - При изменении заслонки с пульта — переключатель обновляется вслед за железом.
 #   - Физический select tion_air_intake_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
 #
-# Требует: esphome/tion_auto_mode.yaml (нужен sensor current_fan_speed)
-#
 # Подключение:
 #
 # packages:
-#   tion_auto_mode:
+#   tion_intake:
 #     url: https://github.com/dima11235/esphome-tion-ha-lovelace
 #     ref: main
 #     refresh: 0s
 #     files:
-#       - esphome/tion_auto_mode.yaml   # обязательно, нужен current_fan_speed
 #       - esphome/tion_intake_3s.yaml   # этот файл
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
-# Желаемое состояние заслонки — источник правды для переключателя в HA.
-# Обновляется только из turn_on/off_action, не из on_value железа.
 globals:
-  - id: air_intake_target_open
+  # Флаг: мы только что отправили команду, следующий on_value — ответ на неё, а не изменение с пульта
+  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов
+  - id: tion_intake_commanding
     type: bool
     restore_value: no
-    initial_value: 'true'
+    initial_value: 'false'
 
-# Физический select — скрыт из HA, при изменении синхронизирует переключатель с желаемым состоянием (только при fan > 0)
+# Физический select — скрыт из HA
 select:
   - platform: tion
     id: tion_air_intake_current
@@ -47,23 +41,28 @@ select:
     internal: true
     on_value:
       - lambda: |-
-          if (int(id(current_fan_speed).state) > 0)
-            id(air_intake_target).publish_state(id(air_intake_target_open));
+          if (id(tion_intake_commanding)) {
+            // Ответ на нашу команду: switch уже в правильном оптимистичном состоянии
+            id(tion_intake_commanding) = false;
+          } else {
+            // Изменение с пульта: обновляем переключатель вслед за железом
+            id(air_intake_target).publish_state(x == "outdoor");
+          }
 
-# Управляющий переключатель — виден в HA, отображает желаемое состояние заслонки
+# Управляющий переключатель — виден в HA
 switch:
   - platform: template
     name: "Air Intake Open"
     id: air_intake_target
     icon: "mdi:valve"
     turn_on_action:
-      - lambda: id(air_intake_target_open) = true;
+      - lambda: id(tion_intake_commanding) = true;
       - logger.log: "tion_intake_3s: target → open (outdoor)"
       - select.set:
           id: tion_air_intake_current
           option: "outdoor"
     turn_off_action:
-      - lambda: id(air_intake_target_open) = false;
+      - lambda: id(tion_intake_commanding) = true;
       - logger.log: "tion_intake_3s: target → closed (indoor)"
       - select.set:
           id: tion_air_intake_current
