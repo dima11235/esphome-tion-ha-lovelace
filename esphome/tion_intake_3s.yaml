@@ -9,15 +9,15 @@
 #   - Физический select tion_air_intake_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
-#   - При загрузке (через 10 с после старта) синхронизирует цель из текущего
-#     состояния железа: читает select и устанавливает global air_intake_target_open.
+#   - Boot-синхронизация: ждёт первого момента когда скорость > 0, затем:
+#       * если пользователь не менял таргет — читает положение заслонки и выставляет таргет по нему;
+#       * если пользователь менял таргет — применяет таргет к железу.
 #   - Автокоррекция: если заслонка самопроизвольно сменила положение при работающем
 #     вентиляторе — возвращает в целевое состояние (реактивно через on_value
 #     и периодически раз в 10 с).
 #   - При скорости 0 заслонка закрывается устройством автоматически — коррекция
 #     не срабатывает, это штатное поведение.
-#   - Флаг boot_sync_done блокирует автокоррекцию на время boot-синхронизации,
-#     чтобы она не изменила железо до того, как цель будет считана.
+#   - Флаг boot_sync_done блокирует автокоррекцию до завершения boot-синхронизации.
 #
 # Требует: esphome/tion_auto_mode.yaml (нужен sensor current_fan_speed)
 #
@@ -34,22 +34,6 @@
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
-# При загрузке синхронизируем цель из текущего состояния железа (после инициализации Tion).
-# Флаг boot_sync_done блокирует автокоррекцию до завершения синхронизации —
-# иначе автокоррекция успеет изменить железо за те 10 секунд ожидания.
-esphome:
-  on_boot:
-    priority: -100.0
-    then:
-      - delay: 10s
-      - logger.log: "tion_intake_3s: syncing target from hardware state on boot"
-      - globals.set:
-          id: air_intake_target_open
-          value: !lambda |-
-            std::string opt = id(tion_air_intake_current).current_option();
-            return opt.empty() || opt == "outdoor";  // не инициализировано → открыто по умолчанию
-      - globals.set: { id: boot_sync_done, value: 'true' }
-
 # Глобальные переменные
 globals:
   - id: air_intake_target_open
@@ -59,6 +43,12 @@ globals:
 
   # Флаг: автокоррекция разрешена только после завершения boot-синхронизации
   - id: boot_sync_done
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
+  # Флаг: пользователь менял таргет до первого запуска вентилятора после загрузки
+  - id: user_changed_target
     type: bool
     restore_value: no
     initial_value: 'false'
@@ -98,6 +88,7 @@ switch:
     lambda: 'return id(air_intake_target_open);'
     turn_on_action:
       - logger.log: "tion_intake_3s: target → open (outdoor)"
+      - globals.set: { id: user_changed_target, value: 'true' }
       - globals.set: { id: air_intake_target_open, value: 'true' }
       - if:
           condition:
@@ -111,6 +102,7 @@ switch:
           # на команды, что привело бы к бесконечным повторным отправкам из автокоррекции.
     turn_off_action:
       - logger.log: "tion_intake_3s: target → closed (indoor)"
+      - globals.set: { id: user_changed_target, value: 'true' }
       - globals.set: { id: air_intake_target_open, value: 'false' }
       - if:
           condition:
@@ -120,8 +112,37 @@ switch:
                 id: tion_air_intake_current
                 option: "indoor"
 
-# Периодическая коррекция — восстанавливает состояние после запуска вентилятора
 interval:
+  # Boot-синхронизация: ждём первого момента когда скорость > 0.
+  # Если пользователь не менял таргет — читаем положение заслонки и выставляем таргет.
+  # Если менял — применяем таргет к железу.
+  - interval: 1s
+    then:
+      - if:
+          condition:
+            and:
+              - lambda: 'return !id(boot_sync_done);'
+              - lambda: 'return int(id(current_fan_speed).state) > 0;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(user_changed_target);'
+                then:
+                  - logger.log: "tion_intake_3s: boot: applying user target to hardware"
+                  - select.set:
+                      id: tion_air_intake_current
+                      option: !lambda |-
+                        return id(air_intake_target_open) ? std::string("outdoor") : std::string("indoor");
+                else:
+                  - logger.log: "tion_intake_3s: boot: syncing target from hardware"
+                  - globals.set:
+                      id: air_intake_target_open
+                      value: !lambda |-
+                        std::string opt = id(tion_air_intake_current).current_option();
+                        return opt.empty() || opt == "outdoor";  // не инициализировано → открыто
+            - globals.set: { id: boot_sync_done, value: 'true' }
+
+  # Периодическая коррекция — восстанавливает состояние при спонтанном изменении заслонки
   - interval: 10s
     then:
       - if:
