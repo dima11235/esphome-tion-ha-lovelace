@@ -45,7 +45,9 @@ esphome:
       - logger.log: "tion_intake_3s: syncing target from hardware state on boot"
       - globals.set:
           id: air_intake_target_open
-          value: !lambda 'return id(tion_air_intake_current).current_option() == "outdoor";'
+          value: !lambda |-
+            std::string opt = id(tion_air_intake_current).current_option();
+            return opt.empty() || opt == "outdoor";  // не инициализировано → открыто по умолчанию
       - globals.set: { id: boot_sync_done, value: 'true' }
 
 # Глобальные переменные
