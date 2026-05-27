@@ -57,7 +57,7 @@ esphome:
 globals:
   - id: air_intake_target_open
     type: bool
-    restore_value: yes
+    restore_value: no
     initial_value: 'true'
 
   # Флаг: автокоррекция разрешена только после завершения boot-синхронизации
