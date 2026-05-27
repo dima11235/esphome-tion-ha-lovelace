@@ -56,7 +56,6 @@ sensor:
             id(tion_intake_fan_was_off) = true;
           } else if (id(tion_intake_fan_was_off)) {
             id(tion_intake_fan_was_off) = false;
-            // Вентилятор только что включился — применяем желаемое состояние заслонки
             auto call = id(tion_air_intake_current).make_call();
             call.set_option(id(air_intake_target).state ? "outdoor" : "indoor");
             call.perform();
