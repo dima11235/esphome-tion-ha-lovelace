@@ -18,7 +18,9 @@
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
-# При загрузке синхронизируем цель из текущего состояния железа (после инициализации Tion)
+# При загрузке синхронизируем цель из текущего состояния железа (после инициализации Tion).
+# Флаг boot_sync_done блокирует автокоррекцию до завершения синхронизации —
+# иначе автокоррекция успеет изменить железо за те 10 секунд ожидания.
 esphome:
   on_boot:
     priority: -100.0
@@ -28,13 +30,20 @@ esphome:
       - globals.set:
           id: air_intake_target_open
           value: !lambda 'return id(tion_air_intake_current).current_option() == "outdoor";'
+      - globals.set: { id: boot_sync_done, value: 'true' }
 
-# Хранит целевое положение заслонки между перезагрузками
+# Глобальные переменные
 globals:
   - id: air_intake_target_open
     type: bool
     restore_value: yes
     initial_value: 'true'
+
+  # Флаг: автокоррекция разрешена только после завершения boot-синхронизации
+  - id: boot_sync_done
+    type: bool
+    restore_value: no
+    initial_value: 'false'
 
 # Физический select — скрыт из HA, только для внутренней логики
 select:
@@ -46,9 +55,11 @@ select:
     on_value:
       # Реактивная коррекция: если заслонка сама сменила положение — вернуть
       # При скорости 0 заслонка закрывается автоматически — это норма, не трогаем
+      # До завершения boot-синхронизации не вмешиваемся
       - if:
           condition:
             and:
+              - lambda: 'return id(boot_sync_done);'
               - lambda: 'return int(id(current_fan_speed).state) > 0;'
               - lambda: |-
                   std::string expected = id(air_intake_target_open) ? "outdoor" : "indoor";
@@ -95,6 +106,7 @@ interval:
       - if:
           condition:
             and:
+              - lambda: 'return id(boot_sync_done);'
               - lambda: 'return int(id(current_fan_speed).state) > 0;'
               - lambda: |-
                   std::string expected = id(air_intake_target_open) ? "outdoor" : "indoor";
