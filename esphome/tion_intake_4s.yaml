@@ -37,6 +37,10 @@ esphome:
 #   recirculation ON  → воздух рециркулирует → заслонка ЗАКРЫТА (indoor)
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
 
+# Немедленная запись глобалов во flash при изменении (иначе при перезагрузке состояние теряется)
+preferences:
+  flash_write_interval: 0s
+
 # Хранит целевое положение заслонки между перезагрузками
 globals:
   - id: air_intake_target_open

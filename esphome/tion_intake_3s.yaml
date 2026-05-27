@@ -30,6 +30,10 @@ esphome:
           option: !lambda |-
             return id(air_intake_target_open) ? std::string("outdoor") : std::string("indoor");
 
+# Немедленная запись глобалов во flash при изменении (иначе при перезагрузке состояние теряется)
+preferences:
+  flash_write_interval: 0s
+
 # Хранит целевое положение заслонки между перезагрузками
 globals:
   - id: air_intake_target_open
