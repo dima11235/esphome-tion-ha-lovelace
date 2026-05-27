@@ -10,9 +10,9 @@
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
 #   - Логика: recirculation ON = заслонка закрыта, recirculation OFF = заслонка открыта.
-#   - Boot-синхронизация: ждёт первого момента когда скорость > 0, затем:
-#       * если пользователь не менял таргет — читает положение заслонки и выставляет таргет по нему;
-#       * если пользователь менял таргет — применяет таргет к железу.
+#   - Boot-синхронизация: через 30 с после старта читает положение заслонки из железа
+#     и выставляет таргет по нему — если пользователь не менял таргет раньше.
+#     Если менял — оставляет таргет пользователя без изменений.
 #   - Автокоррекция: если рециркуляция самопроизвольно сменила состояние при работающем
 #     вентиляторе — возвращает в целевое состояние (реактивно через on_turn_on/off
 #     и периодически раз в 10 с).
@@ -39,6 +39,25 @@
 #   recirculation ON  → воздух рециркулирует → заслонка ЗАКРЫТА (indoor)
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
 
+# Boot-синхронизация: через 30 с читаем состояние железа и выставляем таргет по нему,
+# если пользователь не изменил таргет вручную раньше этого момента.
+esphome:
+  on_boot:
+    priority: -100.0
+    then:
+      - delay: 30s
+      - if:
+          condition:
+            lambda: 'return !id(user_changed_target);'
+          then:
+            - logger.log: "tion_intake_4s: boot: syncing target from hardware"
+            - globals.set:
+                id: air_intake_target_open
+                value: !lambda 'return !id(tion_recirculation_current).state;'
+          else:
+            - logger.log: "tion_intake_4s: boot: user changed target, skipping hardware sync"
+      - globals.set: { id: boot_sync_done, value: 'true' }
+
 # Глобальные переменные
 globals:
   - id: air_intake_target_open
@@ -52,7 +71,7 @@ globals:
     restore_value: no
     initial_value: 'false'
 
-  # Флаг: пользователь менял таргет до первого запуска вентилятора после загрузки
+  # Флаг: пользователь менял таргет до завершения boot-синхронизации
   - id: user_changed_target
     type: bool
     restore_value: no
@@ -120,38 +139,8 @@ switch:
           then:
             - switch.turn_on: tion_recirculation_current
 
+# Периодическая коррекция — восстанавливает состояние при спонтанном изменении заслонки
 interval:
-  # Boot-синхронизация: ждём первого момента когда скорость > 0.
-  # Если пользователь не менял таргет — читаем положение заслонки и выставляем таргет.
-  # Если менял — применяем таргет к железу.
-  - interval: 1s
-    then:
-      - if:
-          condition:
-            and:
-              - lambda: 'return !id(boot_sync_done);'
-              - lambda: 'return int(id(current_fan_speed).state) > 0;'
-          then:
-            - if:
-                condition:
-                  lambda: 'return id(user_changed_target);'
-                then:
-                  - logger.log: "tion_intake_4s: boot: applying user target to hardware"
-                  - if:
-                      condition:
-                        lambda: 'return id(air_intake_target_open);'
-                      then:
-                        - switch.turn_off: tion_recirculation_current
-                      else:
-                        - switch.turn_on: tion_recirculation_current
-                else:
-                  - logger.log: "tion_intake_4s: boot: syncing target from hardware"
-                  - globals.set:
-                      id: air_intake_target_open
-                      value: !lambda 'return !id(tion_recirculation_current).state;'
-            - globals.set: { id: boot_sync_done, value: 'true' }
-
-  # Периодическая коррекция — восстанавливает состояние при спонтанном изменении заслонки
   - interval: 10s
     then:
       - if:
