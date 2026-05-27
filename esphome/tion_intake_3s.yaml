@@ -87,7 +87,7 @@ interval:
               - lambda: 'return int(id(current_fan_speed).state) > 0;'
               - lambda: |-
                   std::string expected = id(air_intake_target_open) ? "outdoor" : "indoor";
-                  return id(tion_air_intake_current).state != expected;
+                  return id(tion_air_intake_current).current_option() != expected;
           then:
             - logger.log: "tion_intake_3s: periodic correction triggered"
             - select.set:
