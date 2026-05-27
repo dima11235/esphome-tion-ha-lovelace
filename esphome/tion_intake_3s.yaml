@@ -6,7 +6,7 @@
 # Что делает:
 #   - Добавляет в HA переключатель switch.air_intake_target — желаемое положение заслонки
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
-#   - При команде из HA — не откатывается, даже если устройство отклоняет команду.
+#   - При команде из HA — не откатывается (optimistic: true).
 #   - При изменении заслонки с пульта — переключатель обновляется вслед за железом.
 #   - Физический select tion_air_intake_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
@@ -24,16 +24,7 @@
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
-globals:
-  # Флаг: мы только что отправили команду — следующий on_value является ответом
-  # устройства, а не изменением с пульта. Сбрасывается после первого on_value.
-  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов.
-  - id: tion_intake_commanding
-    type: bool
-    restore_value: no
-    initial_value: 'false'
-
-# Физический select — скрыт из HA
+# Физический select — скрыт из HA, обновляет переключатель при изменении с пульта
 select:
   - platform: tion
     id: tion_air_intake_current
@@ -41,11 +32,7 @@ select:
     name: "Air Intake"
     internal: true
     on_value:
-      - lambda: |-
-          if (id(tion_intake_commanding))
-            id(tion_intake_commanding) = false;  // ответ устройства — игнорируем
-          else
-            id(air_intake_target).publish_state(x == "outdoor");  // изменение с пульта
+      - lambda: id(air_intake_target).publish_state(x == "outdoor");
 
 # Управляющий переключатель — виден в HA
 switch:
@@ -55,13 +42,11 @@ switch:
     icon: "mdi:valve"
     optimistic: true
     turn_on_action:
-      - lambda: id(tion_intake_commanding) = true;
       - logger.log: "tion_intake_3s: target → open (outdoor)"
       - select.set:
           id: tion_air_intake_current
           option: "outdoor"
     turn_off_action:
-      - lambda: id(tion_intake_commanding) = true;
       - logger.log: "tion_intake_3s: target → closed (indoor)"
       - select.set:
           id: tion_air_intake_current
