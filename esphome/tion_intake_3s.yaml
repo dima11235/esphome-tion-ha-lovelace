@@ -10,12 +10,11 @@
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
 #   - Логика синхронизации (два направления):
-#       Железо → таргет: через 30 с после старта раз в 10 с читает фактическое
-#         положение заслонки. Если оно определено и отличается от таргета — обновляет
-#         таргет. Это отслеживает изменения с пульта бризера.
-#         При скорости 0 не читаем — заслонка всегда закрыта устройством автоматически.
-#       Таргет → железо: при любом изменении таргета из HA сразу отправляет команду
-#         на установку положения заслонки.
+#       Железо → таргет: раз в 10 с читает фактическое положение заслонки.
+#         Если оно определено и отличается от таргета — обновляет таргет.
+#         Отслеживает изменения с пульта бризера.
+#         При скорости 0 пропускаем — заслонка закрыта устройством автоматически.
+#       Таргет → железо: при любом изменении таргета из HA сразу отправляет команду.
 #
 # Требует: esphome/tion_auto_mode.yaml (нужен sensor current_fan_speed)
 #
@@ -32,25 +31,11 @@
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
-# Через 30 с после старта разрешаем периодическое чтение состояния из железа
-esphome:
-  on_boot:
-    priority: -100.0
-    then:
-      - delay: 30s
-      - globals.set: { id: boot_done, value: 'true' }
-      - logger.log: "tion_intake_3s: boot done, starting hardware sync"
-
 globals:
   - id: air_intake_target_open
     type: bool
     restore_value: no
     initial_value: 'true'
-
-  - id: boot_done
-    type: bool
-    restore_value: no
-    initial_value: 'false'
 
 # Физический select — скрыт из HA, только для внутренней логики
 select:
@@ -80,7 +65,7 @@ switch:
           id: tion_air_intake_current
           option: "indoor"
 
-# Периодически читаем положение заслонки из железа.
+# Раз в 10 с читаем фактическое положение заслонки.
 # Если оно определено и отличается от таргета — обновляем таргет.
 # При скорости 0 пропускаем: заслонка закрыта автоматически, это не реальное целевое состояние.
 interval:
@@ -89,14 +74,13 @@ interval:
       - if:
           condition:
             and:
-              - lambda: 'return id(boot_done);'
               - lambda: 'return int(id(current_fan_speed).state) > 0;'
               - lambda: |-
                   std::string opt = id(tion_air_intake_current).current_option();
                   if (opt.empty()) return false;
                   return (opt == "outdoor") != id(air_intake_target_open);
           then:
-            - logger.log: "tion_intake_3s: hardware state differs from target, updating target"
+            - logger.log: "tion_intake_3s: hardware differs from target, updating target"
             - globals.set:
                 id: air_intake_target_open
                 value: !lambda 'return id(tion_air_intake_current).current_option() == "outdoor";'
