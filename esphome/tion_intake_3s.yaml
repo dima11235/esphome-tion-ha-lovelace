@@ -4,11 +4,12 @@
 # Пакет управления воздушной заслонкой для Tion 3S.
 #
 # Что делает:
-#   - Добавляет в HA переключатель switch.air_intake_target — текущее положение заслонки
+#   - Добавляет в HA переключатель switch.air_intake_target — желаемое положение заслонки
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
-#   - Переключатель зеркалит фактическое состояние железа (в том числе изменения с пульта).
-#   - При скорости 0 — сохраняет последнее желаемое состояние (устройство закрывает заслонку
-#     автоматически, но это не отражается в переключателе).
+#   - Переключатель хранит последнюю команду из HA и не откатывается назад,
+#     если устройство отклоняет команду или на короткое время меняет заслонку (скорость 0).
+#   - При скорости 0 — обновления от железа игнорируются, переключатель остаётся в
+#     желаемом состоянии (устройство закрывает заслонку автоматически).
 #   - При изменении переключателя из HA — сразу отправляет команду железу.
 #   - Физический select tion_air_intake_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
@@ -29,7 +30,15 @@
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
-# Физический select — скрыт из HA, обновляет переключатель при изменении состояния (только при fan > 0)
+# Желаемое состояние заслонки — источник правды для переключателя в HA.
+# Обновляется только из turn_on/off_action, не из on_value железа.
+globals:
+  - id: air_intake_target_open
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+# Физический select — скрыт из HA, при изменении синхронизирует переключатель с желаемым состоянием (только при fan > 0)
 select:
   - platform: tion
     id: tion_air_intake_current
@@ -39,20 +48,22 @@ select:
     on_value:
       - lambda: |-
           if (int(id(current_fan_speed).state) > 0)
-            id(air_intake_target).publish_state(x == "outdoor");
+            id(air_intake_target).publish_state(id(air_intake_target_open));
 
-# Управляющий переключатель — виден в HA, зеркалит фактическое положение заслонки
+# Управляющий переключатель — виден в HA, отображает желаемое состояние заслонки
 switch:
   - platform: template
     name: "Air Intake Open"
     id: air_intake_target
     icon: "mdi:valve"
     turn_on_action:
+      - lambda: id(air_intake_target_open) = true;
       - logger.log: "tion_intake_3s: target → open (outdoor)"
       - select.set:
           id: tion_air_intake_current
           option: "outdoor"
     turn_off_action:
+      - lambda: id(air_intake_target_open) = false;
       - logger.log: "tion_intake_3s: target → closed (indoor)"
       - select.set:
           id: tion_air_intake_current
