@@ -8,6 +8,8 @@
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
 #   - При команде из HA — не откатывается (optimistic: true).
 #   - При изменении заслонки с пульта — переключатель обновляется вслед за железом.
+#   - При включении вентилятора (скорость 0 → >0) — повторно применяет желаемое
+#     состояние заслонки, т.к. при скорости 0 устройство игнорирует команды.
 #   - Физический switch tion_recirculation_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
@@ -27,6 +29,33 @@
 # Логика рециркуляции:
 #   recirculation ON  → воздух рециркулирует → заслонка ЗАКРЫТА (indoor)
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
+
+globals:
+  # Отслеживает переход скорости 0 → >0, чтобы повторно применить состояние заслонки
+  - id: tion_intake_fan_was_off
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
+# Датчик скорости — скрыт из HA, нужен для повторного применения при включении вентилятора
+sensor:
+  - platform: tion
+    id: tion_intake_fan_speed
+    type: fan_speed
+    name: "Fan Speed"
+    internal: true
+    on_value:
+      - lambda: |-
+          if (x == 0) {
+            id(tion_intake_fan_was_off) = true;
+          } else if (id(tion_intake_fan_was_off)) {
+            id(tion_intake_fan_was_off) = false;
+            // Вентилятор только что включился — применяем желаемое состояние заслонки
+            if (id(air_intake_target).state)
+              id(tion_recirculation_current).turn_off();
+            else
+              id(tion_recirculation_current).turn_on();
+          }
 
 switch:
   # Физический switch рециркуляции — скрыт из HA, обновляет переключатель при изменении с пульта
