@@ -7,20 +7,24 @@
 #   - Добавляет в HA переключатель switch.air_intake_target — текущее положение заслонки
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
 #   - Переключатель зеркалит фактическое состояние железа (в том числе изменения с пульта).
-#   - При скорости 0 показывает «закрыто» — устройство закрывает заслонку автоматически.
+#   - При скорости 0 — сохраняет последнее желаемое состояние (устройство закрывает заслонку
+#     автоматически, но это не отражается в переключателе).
 #   - При изменении переключателя из HA — сразу отправляет команду железу.
 #   - Физический switch tion_recirculation_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
 #
+# Требует: esphome/tion_auto_mode.yaml (нужен sensor current_fan_speed)
+#
 # Подключение:
 #
 # packages:
-#   tion_intake_4s:
+#   tion_auto_mode:
 #     url: https://github.com/dima11235/esphome-tion-ha-lovelace
 #     ref: main
 #     refresh: 0s
 #     files:
+#       - esphome/tion_auto_mode.yaml   # обязательно, нужен current_fan_speed
 #       - esphome/tion_intake_4s.yaml   # этот файл
 
 ### ESPHome package: Air intake control for Tion 4S (recirculation switch)
@@ -29,7 +33,7 @@
 #   recirculation ON  → воздух рециркулирует → заслонка ЗАКРЫТА (indoor)
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
 
-# Физический switch рециркуляции — скрыт из HA, обновляет переключатель при каждом изменении состояния
+# Физический switch рециркуляции — скрыт из HA, обновляет переключатель при изменении состояния (только при fan > 0)
 switch:
   - platform: tion
     id: tion_recirculation_current
@@ -37,9 +41,13 @@ switch:
     name: "Recirculation"
     internal: true
     on_turn_on:
-      - lambda: 'id(air_intake_target).publish_state(false);'
+      - lambda: |-
+          if (int(id(current_fan_speed).state) > 0)
+            id(air_intake_target).publish_state(false);
     on_turn_off:
-      - lambda: 'id(air_intake_target).publish_state(true);'
+      - lambda: |-
+          if (int(id(current_fan_speed).state) > 0)
+            id(air_intake_target).publish_state(true);
 
   # Управляющий переключатель — виден в HA, зеркалит фактическое положение заслонки
   - platform: template
