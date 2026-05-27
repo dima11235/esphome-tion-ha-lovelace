@@ -29,12 +29,22 @@
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
 
 globals:
-  # Флаг: мы только что отправили команду, следующий on_turn_on/off — ответ на неё, а не изменение с пульта
-  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов
+  # Флаг: команда из HA в процессе. Пока активен — on_turn_on/off игнорируется
+  # (защита от отката устройства и от множественных событий).
+  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов.
   - id: tion_intake_commanding
     type: bool
     restore_value: no
     initial_value: 'false'
+
+# Сбрасывает флаг через 3 секунды после команды.
+# mode: restart — повторная команда продлевает окно.
+script:
+  - id: tion_intake_clear_commanding
+    mode: restart
+    then:
+      - delay: 3s
+      - lambda: id(tion_intake_commanding) = false;
 
 switch:
   # Физический switch рециркуляции — скрыт из HA
@@ -46,20 +56,18 @@ switch:
     on_turn_on:
       - lambda: |-
           if (id(tion_intake_commanding)) {
-            // Ответ на нашу команду: switch уже в правильном оптимистичном состоянии
-            id(tion_intake_commanding) = false;
-          } else {
-            // Изменение с пульта: рециркуляция включилась → заслонка закрыта
-            id(air_intake_target).publish_state(false);
+            // Команда из HA в процессе: игнорируем (защита от отката устройства)
+            return;
           }
+          // Изменение с пульта: рециркуляция включилась → заслонка закрыта
+          id(air_intake_target).publish_state(false);
     on_turn_off:
       - lambda: |-
           if (id(tion_intake_commanding)) {
-            id(tion_intake_commanding) = false;
-          } else {
-            // Изменение с пульта: рециркуляция выключилась → заслонка открыта
-            id(air_intake_target).publish_state(true);
+            return;
           }
+          // Изменение с пульта: рециркуляция выключилась → заслонка открыта
+          id(air_intake_target).publish_state(true);
 
   # Управляющий переключатель — виден в HA
   - platform: template
@@ -68,9 +76,11 @@ switch:
     icon: "mdi:valve"
     turn_on_action:
       - lambda: id(tion_intake_commanding) = true;
+      - script.execute: tion_intake_clear_commanding
       - logger.log: "tion_intake_4s: target → open (recirculation OFF)"
       - switch.turn_off: tion_recirculation_current
     turn_off_action:
       - lambda: id(tion_intake_commanding) = true;
+      - script.execute: tion_intake_clear_commanding
       - logger.log: "tion_intake_4s: target → closed (recirculation ON)"
       - switch.turn_on: tion_recirculation_current

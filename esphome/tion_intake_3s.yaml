@@ -25,12 +25,22 @@
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
 globals:
-  # Флаг: мы только что отправили команду, следующий on_value — ответ на неё, а не изменение с пульта
-  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов
+  # Флаг: команда из HA в процессе. Пока активен — on_value игнорируется
+  # (защита от отката устройства и от множественных on_value).
+  # Префикс tion_intake_ исключает конфликт с глобалами других пакетов.
   - id: tion_intake_commanding
     type: bool
     restore_value: no
     initial_value: 'false'
+
+# Сбрасывает флаг через 3 секунды после команды.
+# mode: restart — повторная команда продлевает окно.
+script:
+  - id: tion_intake_clear_commanding
+    mode: restart
+    then:
+      - delay: 3s
+      - lambda: id(tion_intake_commanding) = false;
 
 # Физический select — скрыт из HA
 select:
@@ -42,12 +52,11 @@ select:
     on_value:
       - lambda: |-
           if (id(tion_intake_commanding)) {
-            // Ответ на нашу команду: switch уже в правильном оптимистичном состоянии
-            id(tion_intake_commanding) = false;
-          } else {
-            // Изменение с пульта: обновляем переключатель вслед за железом
-            id(air_intake_target).publish_state(x == "outdoor");
+            // Команда из HA в процессе: игнорируем (защита от отката устройства)
+            return;
           }
+          // Изменение с пульта: обновляем переключатель вслед за железом
+          id(air_intake_target).publish_state(x == "outdoor");
 
 # Управляющий переключатель — виден в HA
 switch:
@@ -57,12 +66,14 @@ switch:
     icon: "mdi:valve"
     turn_on_action:
       - lambda: id(tion_intake_commanding) = true;
+      - script.execute: tion_intake_clear_commanding
       - logger.log: "tion_intake_3s: target → open (outdoor)"
       - select.set:
           id: tion_air_intake_current
           option: "outdoor"
     turn_off_action:
       - lambda: id(tion_intake_commanding) = true;
+      - script.execute: tion_intake_clear_commanding
       - logger.log: "tion_intake_3s: target → closed (indoor)"
       - select.set:
           id: tion_air_intake_current
