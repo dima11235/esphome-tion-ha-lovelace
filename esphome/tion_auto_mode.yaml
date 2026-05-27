@@ -1,6 +1,38 @@
 # ESPHome-пакет для бризера Tion (https://github.com/dentra/esphome-tion)
 # Репозиторий: https://github.com/dima11235/esphome-tion-ha-lovelace
 #
+# Основной пакет: автоматическое управление скоростью бризера по уровню CO₂.
+#
+# Что делает:
+#   - Читает CO₂ из внешнего сенсора HA (entity_id задаётся через substitution).
+#   - PID-контроллер вычисляет нужную скорость вентилятора по отклонению CO₂
+#     от целевого значения (target_co2). Используется режим COOL: рост CO₂ →
+#     рост выходного сигнала → рост скорости.
+#   - Скорость зажимается в диапазон [min_fan_speed, max_fan_speed].
+#     Если min == max — PID отключается, скорость фиксируется.
+#   - В тихом режиме (silent_mode) скорость фиксируется на 1.
+#   - Все команды к бризеру проходят через script set_fan_speed, который
+#     отправляет climate.control только при изменении скорости.
+#   - Интервал sync_state каждые 10 с проверяет рассинхронизацию между
+#     ESPHome-переключателями и фактическим состоянием climate tion_climate
+#     (например, если бризер был изменён снаружи) и исправляет её.
+#
+# Создаёт сущности в HA (префикс = esphome: name):
+#   switch.power_mode          — включение / выключение бризера
+#   switch.heater_mode         — режим нагрева воздуха
+#   switch.silent_mode         — тихий режим (скорость 1)
+#   number.heater_temperature  — целевая температура нагрева, °C
+#   number.target_co2          — целевой уровень CO₂, ppm
+#   number.min_fan_speed       — нижняя граница скорости (0–6)
+#   number.max_fan_speed       — верхняя граница скорости (0–6)
+#   sensor.fan_speed           — текущая скорость вентилятора
+#   sensor.current_co2         — текущий CO₂ (зеркало внешнего сенсора)
+#   sensor.target_co2_sensor   — целевой CO₂ (для отображения на графиках)
+#
+# Требует:
+#   substitutions.auto_mode_co2_sensor — entity_id сенсора CO₂ в HA
+#   climate.tion_climate               — климат бризера от dentra/esphome-tion
+#
 # Подключение:
 #
 # substitutions:
@@ -17,8 +49,7 @@
 
 ### ESPHome package: Automatic fan control for Tion breezer (CO2 driven)
 
-# Глобальные переменные для синхронизации состояний и хранения последней скорости
-
+# sync_timer — счётчик секунд до следующей синхронизации (не сохраняется между перезагрузками)
 globals:
   - id: sync_timer
     type: int
@@ -27,6 +58,7 @@ globals:
 
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
+  # Текущая скорость вентилятора — читается напрямую с бризера через Tion-компонент
   - platform: tion
     name: "Fan Speed"
     type: fan_speed
@@ -36,6 +68,7 @@ sensor:
     accuracy_decimals: 0
     internal: false
 
+  # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID
   - platform: homeassistant
     name: "Current CO2"
     id: current_co2
@@ -47,6 +80,7 @@ sensor:
     accuracy_decimals: 0
     internal: false
 
+  # Целевой CO₂ как сенсор — нужен только для отображения уставки на графиках рядом с current_co2
   - platform: template
     name: "Target CO2 Sensor"
     id: target_co2_sensor
@@ -60,7 +94,9 @@ sensor:
     lambda: |-
       return id(target_co2).state;
 
-# PID-контроллер управляет скоростью бризера в автоматическом режиме
+# PID-контроллер управляет скоростью бризера в автоматическом режиме.
+# Режим COOL: CO₂ > target → output растёт → скорость растёт (аналог охлаждения).
+# output_averaging_samples сглаживает резкие изменения скорости.
 climate:
   - platform: pid
     id: pid_co2
@@ -77,7 +113,10 @@ climate:
       min_integral: -0.167
       output_averaging_samples: 3
 
-# Применяем вычисленную PID скорость, учитывая Silent Mode и диапазон скоростей
+# Получает выход PID (float 0..1) и переводит в скорость вентилятора (int 0..6),
+# зажатую в диапазон [min_fan_speed, max_fan_speed].
+# Если включён silent_mode — всегда устанавливает скорость 1.
+# Если power_mode выключен — ничего не делает.
 output:
   - platform: template
     id: output_fan_speed
@@ -104,7 +143,10 @@ output:
                         const int requested = static_cast<int>(std::lround(6.0f * state));
                         return std::max<int>(min_speed, std::min<int>(max_speed, requested));
 
-# Скрипт отправляет целевую скорость в климатическую сущность Tion
+# Применяет скорость к climate tion_climate только если она изменилась —
+# чтобы не слать лишние команды бризеру при каждом срабатывании PID.
+# При fan_speed > 0 передаёт режим (HEAT/FAN_ONLY) и температуру нагрева.
+# При fan_speed == 0 переводит климат в режим OFF.
 script:
   - id: set_fan_speed
     parameters:
@@ -130,8 +172,10 @@ script:
                       id: tion_climate
                       mode: 'OFF'
 
-# Переключатели управления питанием, режимами обогрева, авто и тихим режимами
+# Переключатели управления питанием, режимами обогрева и тихим режимом
 switch:
+  # power_mode — главный переключатель. Включение запускает PID (если min != max)
+  # или фиксирует скорость на min_fan_speed (если min == max). Выключение → скорость 0.
   - platform: template
     name: "Power Mode"
     icon: "mdi:power"
@@ -165,6 +209,8 @@ switch:
           id: set_fan_speed
           fan_speed: 0
 
+  # heater_mode — переключает климат между HEAT и FAN_ONLY.
+  # Всегда включает power_mode, чтобы бризер точно работал.
   - platform: template
     name: "Heater Mode"
     icon: "mdi:fire"
@@ -190,6 +236,8 @@ switch:
             - climate.control: { id: tion_climate, mode: "FAN_ONLY" }
       - switch.turn_on: power_mode
 
+  # silent_mode — фиксирует скорость на 1 поверх PID.
+  # При выключении возвращает скорость к min_fan_speed.
   - platform: template
     name: "Silent Mode"
     icon: "mdi:weather-night"
@@ -217,6 +265,7 @@ switch:
 
 # Числовые сущности для задания целевого CO₂, температуры нагрева и допустимого диапазона скоростей
 number:
+  # heater_temperature — применяется немедленно только при работающем бризере
   - platform: template
     name: "Heater Temperature"
     icon: "mdi:thermometer"
@@ -240,6 +289,7 @@ number:
                 id: tion_climate
                 target_temperature: !lambda 'return x;'
 
+  # target_co2 — уставка PID-контроллера; применяется немедленно если PID включён
   - platform: template
     name: "Target CO2"
     id: target_co2
@@ -262,6 +312,9 @@ number:
                 id: pid_co2
                 target_temperature: !lambda 'return x;'
 
+  # min_fan_speed — нижняя граница диапазона. Если новое min > max, поднимает max следом.
+  # Если min == max — PID отключается (фиксированная скорость).
+  # Немедленно применяет скорость, если бризер работает и текущая скорость ниже нового min.
   - platform: template
     name: "Min Fan Speed"
     icon: "mdi:fan"
@@ -292,6 +345,8 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
 
+  # max_fan_speed — верхняя граница диапазона. Если новый max < min, опускает min следом.
+  # Немедленно применяет скорость, если бризер работает и текущая скорость выше нового max.
   - platform: template
     name: "Max Fan Speed"
     icon: "mdi:fan"
@@ -322,7 +377,14 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
 
-# Периодическая синхронизация состояний между ESPHome и Home Assistant
+# Периодическая синхронизация состояний между ESPHome и Home Assistant.
+# Срабатывает каждую секунду, но реальные проверки выполняются раз в 10 с (sync_timer >= 10).
+# Исправляет рассинхронизацию, если tion_climate был изменён снаружи (например, из HA напрямую):
+#   - если min != max и power включён, но PID выключен → включает PID
+#   - если min == max или power выключен, но PID включён → выключает PID
+#   - если tion_climate работает, но power_mode выключен → включает power_mode
+#   - если tion_climate греет, но heater_temperature расходится → синхронизирует температуру
+#   - если tion_climate переключил режим нагрева → синхронизирует heater_mode
 interval:
   - interval: 1s
     id: sync_state
@@ -395,5 +457,3 @@ interval:
                 then:
                   - logger.log: "tion_auto_mode: sync state: set heater_mode off"
                   - switch.turn_off: heater_mode
-
-
