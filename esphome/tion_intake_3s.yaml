@@ -18,6 +18,18 @@
 
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
+# Применяем целевое положение заслонки при старте (после инициализации компонента Tion)
+esphome:
+  on_boot:
+    priority: -100.0
+    then:
+      - delay: 10s
+      - logger.log: "tion_intake_3s: applying target air intake on boot"
+      - select.set:
+          id: tion_air_intake_current
+          option: !lambda |-
+            return id(air_intake_target_open) ? std::string("outdoor") : std::string("indoor");
+
 # Хранит целевое положение заслонки между перезагрузками
 globals:
   - id: air_intake_target_open

@@ -18,6 +18,21 @@
 
 ### ESPHome package: Air intake control for Tion 4S (recirculation switch)
 
+# Применяем целевое положение заслонки при старте (после инициализации компонента Tion)
+esphome:
+  on_boot:
+    priority: -100.0
+    then:
+      - delay: 10s
+      - logger.log: "tion_intake_4s: applying target air intake on boot"
+      - if:
+          condition:
+            lambda: 'return id(air_intake_target_open);'
+          then:
+            - switch.turn_off: tion_recirculation_current
+          else:
+            - switch.turn_on: tion_recirculation_current
+
 # Логика рециркуляции:
 #   recirculation ON  → воздух рециркулирует → заслонка ЗАКРЫТА (indoor)
 #   recirculation OFF → воздух с улицы      → заслонка ОТКРЫТА (outdoor)
