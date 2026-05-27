@@ -214,7 +214,8 @@ switch:
           fan_speed: 0
 
   # heater_mode — переключает климат между HEAT и FAN_ONLY.
-  # Всегда включает power_mode, чтобы бризер точно работал.
+  # Всегда включает power_mode в обоих направлениях (вкл и выкл нагрева) —
+  # переключение режима нагрева подразумевает, что бризер должен работать.
   - platform: template
     name: "Heater Mode"
     icon: "mdi:fire"
