@@ -53,21 +53,16 @@ switch:
     type: recirculation
     name: "Recirculation"
     internal: true
+    # Если команда из HA в процессе — игнорируем (защита от отката устройства).
+    # Иначе это изменение с пульта — обновляем переключатель вслед за железом.
     on_turn_on:
       - lambda: |-
-          if (id(tion_intake_commanding)) {
-            // Команда из HA в процессе: игнорируем (защита от отката устройства)
-            return;
-          }
-          // Изменение с пульта: рециркуляция включилась → заслонка закрыта
-          id(air_intake_target).publish_state(false);
+          if (!id(tion_intake_commanding))
+            id(air_intake_target).publish_state(false);  // recirculation ON → заслонка закрыта
     on_turn_off:
       - lambda: |-
-          if (id(tion_intake_commanding)) {
-            return;
-          }
-          // Изменение с пульта: рециркуляция выключилась → заслонка открыта
-          id(air_intake_target).publish_state(true);
+          if (!id(tion_intake_commanding))
+            id(air_intake_target).publish_state(true);   // recirculation OFF → заслонка открыта
 
   # Управляющий переключатель — виден в HA
   - platform: template

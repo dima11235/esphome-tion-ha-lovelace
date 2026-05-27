@@ -50,13 +50,11 @@ select:
     name: "Air Intake"
     internal: true
     on_value:
+      # Если команда из HA в процессе — игнорируем (защита от отката устройства).
+      # Иначе это изменение с пульта — обновляем переключатель вслед за железом.
       - lambda: |-
-          if (id(tion_intake_commanding)) {
-            // Команда из HA в процессе: игнорируем (защита от отката устройства)
-            return;
-          }
-          // Изменение с пульта: обновляем переключатель вслед за железом
-          id(air_intake_target).publish_state(x == "outdoor");
+          if (!id(tion_intake_commanding))
+            id(air_intake_target).publish_state(x == "outdoor");
 
 # Управляющий переключатель — виден в HA
 switch:
