@@ -78,7 +78,19 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
 
-  # Целевой CO₂ как сенсор — нужен только для отображения уставки на графиках рядом с current_co2
+  # Целевой CO₂ как sensor — зеркало number.target_co2 для отображения на графиках.
+  #
+  # Зачем нужен отдельный sensor, если есть number.target_co2:
+  #   - в исторических графиках HA (history-graph, ApexCharts) sensor рисуется
+  #     как непрерывная линия, а number — как ступенчатая или вовсе не рисуется
+  #     в зависимости от карточки/версии HA;
+  #   - сенсор с device_class=carbon_dioxide и state_class=measurement
+  #     встаёт на одну ось с sensor.current_co2 на графике без доп. настроек;
+  #   - force_update: true + update_interval: 60s гарантирует регулярные
+  #     точки данных, чтобы линия уставки была непрерывной даже когда
+  #     значение не меняется (иначе график «обрывается»).
+  #
+  # Это сознательное дублирование данных ради UX графиков — оставлено намеренно.
   - platform: template
     name: "Target CO2 Sensor"
     id: target_co2_sensor
@@ -115,6 +127,18 @@ climate:
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode off"
             - switch.turn_off: heater_mode
+      # heater_temperature синхронизируется ТОЛЬКО когда железо в режиме HEAT —
+      # это сознательное ограничение под специфику пульта и протокола Tion:
+      #   - в режиме FAN_ONLY поле target_temperature в пакете состояния
+      #     может содержать неактуальное / промежуточное значение
+      #     (зависит от модели и прошивки бризера), синхронизировать его
+      #     в этот момент нельзя — иначе number.heater_temperature сбросится
+      #     на мусорное значение.
+      #   - корректное target_temperature гарантированно публикуется только
+      #     в режиме HEAT — там его и подхватываем.
+      #   - сценарий «температуру изменили в FAN_ONLY с пульта» решается
+      #     отложенно: при следующем переключении в HEAT on_state снова
+      #     сработает с уже актуальным значением.
       - if:
           condition:
             and:
