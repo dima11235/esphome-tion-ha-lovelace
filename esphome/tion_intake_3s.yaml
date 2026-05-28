@@ -84,14 +84,9 @@ switch:
     turn_on_action:
       - lambda: id(tion_intake_desired_open) = true;
       - logger.log: "tion_intake_3s: target → open (outdoor)"
-      - if:
-          condition:
-            lambda: return id(tion_intake_fan_speed).state > 0;
-          then:
-            - select.set:
-                id: tion_air_intake_current
-                option: "outdoor"
-            # При fan=0 команда игнорируется устройством — отложим до включения вентилятора
+      - select.set:
+          id: tion_air_intake_current
+          option: "outdoor"
     turn_off_action:
       - lambda: id(tion_intake_desired_open) = false;
       - logger.log: "tion_intake_3s: target → closed (indoor)"
