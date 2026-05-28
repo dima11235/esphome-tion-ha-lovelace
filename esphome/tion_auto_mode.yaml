@@ -49,16 +49,6 @@
 
 ### ESPHome package: Automatic fan control for Tion breezer (CO2 driven)
 
-# sync_timer — счётчик секунд с момента последнего действия.
-# Любое действие (включение, смена скорости и т. д.) сбрасывает его в 0.
-# Синхронизация выполняется только когда прошло ровно 10 с без действий.
-# Именно поэтому используется интервал 1 с со счётчиком, а не прямой интервал 10 с —
-# прямой интервал срабатывал бы по своему расписанию, не учитывая момент последнего действия.
-globals:
-  - id: sync_timer
-    type: int
-    restore_value: no
-    initial_value: '0'
 
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
@@ -203,7 +193,6 @@ script:
           condition:
             lambda: 'return fan_speed != int(id(current_fan_speed).state);'
           then:
-            - globals.set: { id: sync_timer, value: "0" }
             - if:
                 condition:
                   lambda: 'return fan_speed > 0;'
@@ -230,7 +219,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - logger.log: "switch.power_mode: turn_on_action"
-      - globals.set: { id: sync_timer, value: "0" }
       - script.execute:
           id: set_fan_speed
           fan_speed: !lambda 'return int(id(min_fan_speed).state);'
@@ -247,7 +235,6 @@ switch:
                 mode: 'OFF'
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
-      - globals.set: { id: sync_timer, value: "0" }
       - climate.control:
           id: pid_co2
           mode: 'OFF'
@@ -267,7 +254,6 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - logger.log: "switch.heater_mode: turn_on_action"
-      - globals.set: { id: sync_timer, value: "0" }
       - if:
           condition:
             lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY && int(id(current_fan_speed).state) > 0;'
@@ -276,7 +262,6 @@ switch:
       - switch.turn_on: power_mode
     turn_off_action:
       - logger.log: "switch.heater_mode: turn_off_action"
-      - globals.set: { id: sync_timer, value: "0" }
       - if:
           condition:
             lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT && int(id(current_fan_speed).state) > 0;'
@@ -332,7 +317,6 @@ number:
           condition:
             lambda: 'return x != id(tion_climate_current).target_temperature && int(id(current_fan_speed).state) > 0;'
           then:
-            - globals.set: { id: sync_timer, value: "0" }
             - climate.control:
                 id: tion_climate_current
                 target_temperature: !lambda 'return x;'
@@ -392,6 +376,21 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
+      - if:
+          condition:
+            and:
+              - switch.is_on: power_mode
+              - lambda: 'return id(max_fan_speed).state != x;'  # min != max → PID нужен
+              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
+          then:
+            - climate.control: { id: pid_co2, mode: 'COOL' }
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(max_fan_speed).state == x;'  # min == max → PID не нужен
+              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
+          then:
+            - climate.control: { id: pid_co2, mode: 'OFF' }
 
   # max_fan_speed — верхняя граница диапазона. Если новый max < min, опускает min следом.
   # Немедленно применяет скорость, если бризер работает и текущая скорость выше нового max.
@@ -424,42 +423,18 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
-
-# Периодическая проверка согласованности PID — страховка на случай рассинхрона.
-# Срабатывает каждые 10 с. heater_mode, heater_temperature и power_mode синхронизируются
-# событийно через tion_climate_current.on_state.
-interval:
-  - interval: 1s
-    id: sync_state
-    then:
       - if:
           condition:
-            lambda: 'return id(sync_timer)++ >= 10;'
+            and:
+              - switch.is_on: power_mode
+              - lambda: 'return id(min_fan_speed).state != x;'  # min != max → PID нужен
+              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
           then:
-            - globals.set: { id: sync_timer, value: "0" }
-
-            - if:
-                condition:
-                  lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
-                then:
-                  - if:
-                      condition:
-                        and:
-                          - switch.is_on: power_mode
-                          - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
-                      then:
-                        - climate.control:
-                            id: pid_co2
-                            mode: 'COOL'
-                        - logger.log: "tion_auto_mode: sync state: turn PID on"
-                else:
-                  - if:
-                      condition:
-                        or:
-                          - switch.is_off: power_mode
-                          - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
-                      then:
-                        - climate.control:
-                            id: pid_co2
-                            mode: 'OFF'
-                        - logger.log: "tion_auto_mode: sync state: turn PID off"
+            - climate.control: { id: pid_co2, mode: 'COOL' }
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(min_fan_speed).state == x;'  # min == max → PID не нужен
+              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
+          then:
+            - climate.control: { id: pid_co2, mode: 'OFF' }
