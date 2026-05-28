@@ -425,14 +425,9 @@ number:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
 
-# Периодическая синхронизация состояний между ESPHome и Home Assistant.
-# Срабатывает каждую секунду, но реальные проверки выполняются раз в 10 с (sync_timer >= 10).
-# Исправляет рассинхронизацию, если tion_climate был изменён снаружи (например, из HA напрямую):
-#   - если min != max и power включён, но PID выключен → включает PID
-#   - если min == max или power выключен, но PID включён → выключает PID
-#   - если tion_climate работает, но power_mode выключен → включает power_mode
-#   - если tion_climate греет, но heater_temperature расходится → синхронизирует температуру
-#   - если tion_climate переключил режим нагрева → синхронизирует heater_mode
+# Периодическая проверка согласованности PID — страховка на случай рассинхрона.
+# Срабатывает каждые 10 с. heater_mode, heater_temperature и power_mode синхронизируются
+# событийно через tion_climate_current.on_state.
 interval:
   - interval: 1s
     id: sync_state
@@ -468,40 +463,3 @@ interval:
                             id: pid_co2
                             mode: 'OFF'
                         - logger.log: "tion_auto_mode: sync state: turn PID off"
-
-            - if:
-                condition:
-                  and:
-                    - lambda: 'return id(tion_climate).mode != CLIMATE_MODE_OFF;'
-                    - switch.is_off: power_mode
-                then:
-                  - logger.log: "tion_auto_mode: sync state: turn power_mode on"
-                  - switch.turn_on: power_mode
-
-            - if:
-                condition:
-                  and:
-                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;'
-                    - lambda: 'return id(tion_climate).target_temperature != id(heater_temperature).state;'
-                then:
-                  - logger.log: "tion_auto_mode: sync state: set heater_temperature"
-                  - number.set:
-                      id: heater_temperature
-                      value: !lambda 'return id(tion_climate).target_temperature;'
-
-            - if:
-                condition:
-                  and:
-                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_HEAT;'
-                    - switch.is_off: heater_mode
-                then:
-                  - logger.log: "tion_auto_mode: sync state: set heater_mode on"
-                  - switch.turn_on: heater_mode
-            - if:
-                condition:
-                  and:
-                    - lambda: 'return id(tion_climate).mode == CLIMATE_MODE_FAN_ONLY;'
-                    - switch.is_on: heater_mode
-                then:
-                  - logger.log: "tion_auto_mode: sync state: set heater_mode off"
-                  - switch.turn_off: heater_mode
