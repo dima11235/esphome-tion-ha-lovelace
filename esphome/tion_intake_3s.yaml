@@ -41,7 +41,9 @@ select:
     name: "Air Intake"
     internal: true
     on_value:
-      - lambda: id(air_intake_target).publish_state(x == "outdoor");
+      - lambda: |-
+          if (id(tion_intake_fan_speed).state > 0)
+            id(air_intake_target).publish_state(x == "outdoor");
 
 # Датчик скорости — скрыт из HA, нужен для повторного применения при включении вентилятора
 sensor:

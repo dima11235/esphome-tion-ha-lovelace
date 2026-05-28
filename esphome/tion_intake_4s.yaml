@@ -64,9 +64,13 @@ switch:
     name: "Recirculation"
     internal: true
     on_turn_on:
-      - lambda: id(air_intake_target).publish_state(false);  // рециркуляция ON → закрыто
+      - lambda: |-
+          if (id(tion_intake_fan_speed).state > 0)
+            id(air_intake_target).publish_state(false);  // рециркуляция ON → закрыто
     on_turn_off:
-      - lambda: id(air_intake_target).publish_state(true);   // рециркуляция OFF → открыто
+      - lambda: |-
+          if (id(tion_intake_fan_speed).state > 0)
+            id(air_intake_target).publish_state(true);   // рециркуляция OFF → открыто
 
   # Управляющий переключатель — виден в HA
   - platform: template
