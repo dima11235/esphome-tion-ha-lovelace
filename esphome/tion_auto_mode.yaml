@@ -108,7 +108,7 @@ climate:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
               - switch.is_off: heater_mode
           then:
-            - logger.log: "tion_climate_current: on_state: set heater_mode on"
+            - logger.log: "climate.tion_climate_current: on_state: set heater_mode on"
             - switch.turn_on: heater_mode
       - if:
           condition:
@@ -116,7 +116,7 @@ climate:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY;'
               - switch.is_on: heater_mode
           then:
-            - logger.log: "tion_climate_current: on_state: set heater_mode off"
+            - logger.log: "climate.tion_climate_current: on_state: set heater_mode off"
             - switch.turn_off: heater_mode
       - if:
           condition:
@@ -124,7 +124,7 @@ climate:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
               - lambda: 'return id(tion_climate_current).target_temperature != id(heater_temperature).state;'
           then:
-            - logger.log: "tion_climate_current: on_state: set heater_temperature"
+            - logger.log: "climate.tion_climate_current: on_state: set heater_temperature"
             - number.set:
                 id: heater_temperature
                 value: !lambda 'return id(tion_climate_current).target_temperature;'
@@ -134,7 +134,7 @@ climate:
               - lambda: 'return id(tion_climate_current).mode != CLIMATE_MODE_OFF;'
               - switch.is_off: power_mode
           then:
-            - logger.log: "tion_climate_current: on_state: turn power_mode on"
+            - logger.log: "climate.tion_climate_current: on_state: turn power_mode on"
             - switch.turn_on: power_mode
       - if:
           condition:
@@ -142,7 +142,7 @@ climate:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_OFF;'
               - switch.is_on: power_mode
           then:
-            - logger.log: "tion_climate_current: on_state: turn power_mode off"
+            - logger.log: "climate.tion_climate_current: on_state: turn power_mode off"
             - switch.turn_off: power_mode
 
 # PID-контроллер управляет скоростью бризера в автоматическом режиме.
@@ -172,7 +172,7 @@ output:
     id: output_fan_speed
     type: float
     write_action:
-      - logger.log: "output_fan_speed: write_action"
+      - logger.log: "output.output_fan_speed: write_action"
       - if:
           condition:
             switch.is_on: power_mode
@@ -202,7 +202,7 @@ script:
     parameters:
       fan_speed: int
     then:
-      - logger.log: "set_fan_speed"
+      - logger.log: "script.set_fan_speed"
       - if:
           condition:
             lambda: 'return fan_speed != int(id(current_fan_speed).state);'
@@ -231,6 +231,7 @@ script:
       min: int
       max: int
     then:
+      - logger.log: "script.sync_pid_mode"
       - if:
           condition:
             lambda: 'return min != max;'
@@ -384,7 +385,7 @@ number:
     restore_value: true
     initial_value: 750
     set_action:
-      - logger.log: "tion_auto_mode: number.target_co2: set_action"
+      - logger.log: "number.target_co2: set_action"
       - if:
           condition:
             lambda: 'return x != id(pid_co2).target_temperature;'
@@ -407,7 +408,7 @@ number:
     restore_value: true
     initial_value: 1
     set_action:
-      - logger.log: "tion_auto_mode: number.min_fan_speed: set_action"
+      - logger.log: "number.min_fan_speed: set_action"
       - if:
           condition:
             lambda: 'return x > id(max_fan_speed).state;'
@@ -447,7 +448,7 @@ number:
     restore_value: true
     initial_value: 2
     set_action:
-      - logger.log: "tion_auto_mode: number.max_fan_speed: set_action"
+      - logger.log: "number.max_fan_speed: set_action"
       - if:
           condition:
             lambda: 'return x < id(min_fan_speed).state;'
