@@ -213,6 +213,32 @@ script:
                       id: tion_climate_current
                       mode: 'OFF'
 
+  # sync_pid_mode — выбирает корректный режим pid_co2 для заданного диапазона скоростей.
+  # Правило: min != max → PID нужен (COOL), иначе PID не нужен (OFF, скорость фиксирована).
+  # Предусловие: вызывать только когда power_mode ON. Проверка остаётся в месте вызова.
+  # Параметры min/max передаются явно, потому что при вызове из number.set_action
+  # state самого number ещё содержит старое значение (optimistic publish после action).
+  - id: sync_pid_mode
+    parameters:
+      min: int
+      max: int
+    then:
+      - if:
+          condition:
+            lambda: 'return min != max;'
+          then:
+            - if:
+                condition:
+                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
+                then:
+                  - climate.control: { id: pid_co2, mode: 'COOL' }
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
+                then:
+                  - climate.control: { id: pid_co2, mode: 'OFF' }
+
 # Переключатели управления питанием, режимами обогрева и тихим режимом
 switch:
   # power_mode — главный переключатель. Включение запускает PID (если min != max)
@@ -237,17 +263,10 @@ switch:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return int(id(min_fan_speed).state);'
-      - if:
-          condition:
-            lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
-          then:
-            - climate.control:
-                id: pid_co2
-                mode: 'COOL'
-          else:
-            - climate.control:
-                id: pid_co2
-                mode: 'OFF'
+      - script.execute:
+          id: sync_pid_mode
+          min: !lambda 'return int(id(min_fan_speed).state);'
+          max: !lambda 'return int(id(max_fan_speed).state);'
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
       - climate.control:
@@ -400,19 +419,12 @@ number:
                 fan_speed: !lambda 'return x;'
       - if:
           condition:
-            and:
-              - switch.is_on: power_mode
-              - lambda: 'return id(max_fan_speed).state != x;'  # min != max → PID нужен
-              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
+            switch.is_on: power_mode
           then:
-            - climate.control: { id: pid_co2, mode: 'COOL' }
-      - if:
-          condition:
-            and:
-              - lambda: 'return id(max_fan_speed).state == x;'  # min == max → PID не нужен
-              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
-          then:
-            - climate.control: { id: pid_co2, mode: 'OFF' }
+            - script.execute:
+                id: sync_pid_mode
+                min: !lambda 'return int(x);'
+                max: !lambda 'return int(id(max_fan_speed).state);'
 
   # max_fan_speed — верхняя граница диапазона. Если новый max < min, опускает min следом.
   # Немедленно применяет скорость, если бризер работает и текущая скорость выше нового max.
@@ -447,16 +459,9 @@ number:
                 fan_speed: !lambda 'return x;'
       - if:
           condition:
-            and:
-              - switch.is_on: power_mode
-              - lambda: 'return id(min_fan_speed).state != x;'  # min != max → PID нужен
-              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_COOL;'
+            switch.is_on: power_mode
           then:
-            - climate.control: { id: pid_co2, mode: 'COOL' }
-      - if:
-          condition:
-            and:
-              - lambda: 'return id(min_fan_speed).state == x;'  # min == max → PID не нужен
-              - lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
-          then:
-            - climate.control: { id: pid_co2, mode: 'OFF' }
+            - script.execute:
+                id: sync_pid_mode
+                min: !lambda 'return int(id(min_fan_speed).state);'
+                max: !lambda 'return int(x);'
