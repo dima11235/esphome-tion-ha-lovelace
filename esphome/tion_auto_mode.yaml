@@ -136,6 +136,14 @@ climate:
           then:
             - logger.log: "tion_climate_current: on_state: turn power_mode on"
             - switch.turn_on: power_mode
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_OFF;'
+              - switch.is_on: power_mode
+          then:
+            - logger.log: "tion_climate_current: on_state: turn power_mode off"
+            - switch.turn_off: power_mode
 
 # PID-контроллер управляет скоростью бризера в автоматическом режиме.
 # Режим COOL: CO₂ > target → output растёт → скорость растёт (аналог охлаждения).
