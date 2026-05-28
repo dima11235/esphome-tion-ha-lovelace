@@ -122,6 +122,24 @@ climate:
           then:
             - logger.log: "tion_climate_current: on_state: set heater_mode off"
             - switch.turn_off: heater_mode
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
+              - lambda: 'return id(tion_climate_current).target_temperature != id(heater_temperature).state;'
+          then:
+            - logger.log: "tion_climate_current: on_state: set heater_temperature"
+            - number.set:
+                id: heater_temperature
+                value: !lambda 'return id(tion_climate_current).target_temperature;'
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(tion_climate_current).mode != CLIMATE_MODE_OFF;'
+              - switch.is_off: power_mode
+          then:
+            - logger.log: "tion_climate_current: on_state: turn power_mode on"
+            - switch.turn_on: power_mode
 
 # PID-контроллер управляет скоростью бризера в автоматическом режиме.
 # Режим COOL: CO₂ > target → output растёт → скорость растёт (аналог охлаждения).
