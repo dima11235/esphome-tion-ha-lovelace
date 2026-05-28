@@ -4,7 +4,7 @@
 # Пакет управления воздушной заслонкой для Tion 3S.
 #
 # Что делает:
-#   - Добавляет в HA переключатель switch.air_intake_target — желаемое положение заслонки
+#   - Добавляет в HA переключатель switch.tion_air_intake_target — желаемое положение заслонки
 #     (вкл = открыто / воздух с улицы, выкл = закрыто / рециркуляция).
 #   - При команде из HA — не откатывается (optimistic: true).
 #   - При изменении заслонки с пульта — переключатель обновляется вслед за железом.
@@ -13,6 +13,18 @@
 #   - Физический select tion_air_intake_current определяется здесь с internal: true
 #     и скрыт из HA. В ESPHome-конфиге бризера его можно убрать или оставить —
 #     этот пакет не зависит от внешнего определения.
+#
+# Особенности железа (проверено на устройстве):
+#   - При fan_speed=0 устройство игнорирует команды заслонки; on_value при этом
+#     НЕ срабатывает — switch не откатывается, но заслонка остаётся в старом положении.
+#   - При остановке вентилятора заслонка не меняет положение сама (не закрывается).
+#   - Как только fan_speed переходит 0→>0 — команды снова принимаются.
+#
+# Алгоритм повторного применения при включении вентилятора:
+#   1. Флаг tion_intake_fan_was_off взводится при fan_speed=0 (и при загрузке — initial: true).
+#   2. При первом тике >0 — посылаем команду заслонки согласно tion_air_intake_target.state.
+#   3. optimistic: true на switch — не откатывает состояние когда железо молчит (fan=0).
+#      Без этого switch сбрасывался бы в исходное положение через секунду.
 #
 # Подключение:
 #
@@ -27,11 +39,10 @@
 ### ESPHome package: Air intake control for Tion 3S (outdoor / indoor / mixed)
 
 globals:
-  # Отслеживает переход скорости 0 → >0, чтобы повторно применить состояние заслонки
   - id: tion_intake_fan_was_off
     type: bool
     restore_value: no
-    initial_value: 'true'
+    initial_value: 'true'  # true = при загрузке считаем, что вентилятор был выключен → повторим команду на первом тике
 
 # Физический select — скрыт из HA, обновляет переключатель при изменении с пульта
 select:
@@ -41,7 +52,7 @@ select:
     name: "Air Intake"
     internal: true
     on_value:
-      - lambda: id(air_intake_target).publish_state(x == "outdoor");
+      - lambda: id(tion_air_intake_target).publish_state(x == "outdoor");
 
 # Датчик скорости — скрыт из HA, нужен для повторного применения при включении вентилятора
 sensor:
@@ -53,11 +64,12 @@ sensor:
     on_value:
       - lambda: |-
           if (x == 0) {
-            id(tion_intake_fan_was_off) = true;
+            id(tion_intake_fan_was_off) = true;  // при fan=0 железо игнорирует команды
           } else if (id(tion_intake_fan_was_off)) {
             id(tion_intake_fan_was_off) = false;
+            // первый тик после включения — повторяем желаемое состояние заслонки
             auto call = id(tion_air_intake_current).make_call();
-            call.set_option(id(air_intake_target).state ? "outdoor" : "indoor");
+            call.set_option(id(tion_air_intake_target).state ? "outdoor" : "indoor");
             call.perform();
           }
 
@@ -65,9 +77,9 @@ sensor:
 switch:
   - platform: template
     name: "Air Intake Open"
-    id: air_intake_target
+    id: tion_air_intake_target
     icon: "mdi:valve"
-    optimistic: true
+    optimistic: true       # не откатывать состояние при fan=0 (железо молчит, on_value не срабатывает)
     restore_mode: RESTORE_DEFAULT_ON
     turn_on_action:
       - logger.log: "tion_intake_3s: target → open (outdoor)"
