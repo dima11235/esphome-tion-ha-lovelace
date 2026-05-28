@@ -98,10 +98,34 @@ sensor:
     lambda: |-
       return id(target_co2).state;
 
+# Внутренний дубликат tion_climate — для получения on_state при любом изменении состояния железа.
+# По той же схеме что tion_air_intake_current в tion_intake_3s.yaml.
+climate:
+  - platform: tion
+    id: tion_climate_current
+    internal: true
+    name: "Climate Current"
+    on_state:
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
+              - switch.is_off: heater_mode
+          then:
+            - logger.log: "tion_climate_current: on_state: set heater_mode on"
+            - switch.turn_on: heater_mode
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY;'
+              - switch.is_on: heater_mode
+          then:
+            - logger.log: "tion_climate_current: on_state: set heater_mode off"
+            - switch.turn_off: heater_mode
+
 # PID-контроллер управляет скоростью бризера в автоматическом режиме.
 # Режим COOL: CO₂ > target → output растёт → скорость растёт (аналог охлаждения).
 # output_averaging_samples сглаживает резкие изменения скорости.
-climate:
   - platform: pid
     id: pid_co2
     internal: true
