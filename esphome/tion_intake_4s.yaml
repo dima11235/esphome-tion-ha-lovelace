@@ -82,7 +82,7 @@ switch:
 
   # Управляющий переключатель — виден в HA
   - platform: template
-    name: "Air Intake Open"
+    name: "Air Intake"
     id: tion_air_intake_target
     icon: "mdi:valve"
     optimistic: true       # не откатывать состояние при fan=0 (железо молчит, on_turn_on/off не срабатывает)
