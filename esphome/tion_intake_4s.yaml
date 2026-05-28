@@ -90,7 +90,12 @@ switch:
     turn_on_action:
       - lambda: id(tion_intake_desired_open) = true;
       - logger.log: "tion_intake_4s: target → open (recirculation OFF)"
-      - switch.turn_off: tion_recirculation_current
+      - if:
+          condition:
+            lambda: return id(tion_intake_fan_speed).state > 0;
+          then:
+            - switch.turn_off: tion_recirculation_current
+            # При fan=0 команда игнорируется устройством — отложим до включения вентилятора
     turn_off_action:
       - lambda: id(tion_intake_desired_open) = false;
       - logger.log: "tion_intake_4s: target → closed (recirculation ON)"
