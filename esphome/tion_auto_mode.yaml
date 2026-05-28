@@ -217,6 +217,11 @@ script:
 switch:
   # power_mode — главный переключатель. Включение запускает PID (если min != max)
   # или фиксирует скорость на min_fan_speed (если min == max). Выключение → скорость 0.
+  #
+  # Если бризер уже работает (fan_speed > 0) — это означает синхронизацию состояния
+  # с уже включённым железом (например, бризер включили с пульта). В этом случае
+  # set_fan_speed не вызывается, чтобы сохранить реальную скорость с железа,
+  # а не сбрасывать её на min_fan_speed.
   - platform: template
     name: "Power Mode"
     icon: "mdi:power"
@@ -225,9 +230,13 @@ switch:
     restore_mode: RESTORE_DEFAULT_OFF
     turn_on_action:
       - logger.log: "switch.power_mode: turn_on_action"
-      - script.execute:
-          id: set_fan_speed
-          fan_speed: !lambda 'return int(id(min_fan_speed).state);'
+      - if:
+          condition:
+            lambda: 'return int(id(current_fan_speed).state) == 0;'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return int(id(min_fan_speed).state);'
       - if:
           condition:
             lambda: 'return id(min_fan_speed).state != id(max_fan_speed).state;'
@@ -248,9 +257,16 @@ switch:
           id: set_fan_speed
           fan_speed: 0
 
-  # heater_mode — переключает климат между HEAT и FAN_ONLY.
-  # Всегда включает power_mode в обоих направлениях (вкл и выкл нагрева) —
-  # переключение режима нагрева подразумевает, что бризер должен работать.
+  # heater_mode — выбор между двумя рабочими режимами бризера: HEAT (нагрев) и FAN_ONLY (вентиляция).
+  #
+  # Принцип: heater_mode не выключает бризер. Оба положения переключателя
+  # соответствуют РАБОТАЮЩЕМУ бризеру — просто с разным режимом обработки воздуха:
+  #   ON  → бризер работает в режиме нагрева (HEAT)
+  #   OFF → бризер работает в режиме вентиляции (FAN_ONLY)
+  # Поэтому turn_on_action и turn_off_action оба включают power_mode —
+  # любое осознанное переключение режима подразумевает, что бризер должен работать.
+  # Если до переключения бризер был выключен — он включится с min_fan_speed.
+  #
   # Для выключения бризера использовать power_mode, а не heater_mode.
   - platform: template
     name: "Heater Mode"
