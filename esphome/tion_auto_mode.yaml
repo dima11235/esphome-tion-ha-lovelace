@@ -67,7 +67,10 @@ sensor:
     state_class: "measurement"
     accuracy_decimals: 0
 
-  # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID
+  # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID.
+  # internal: false ОБЯЗАТЕЛЬНО: для platform: homeassistant дефолт — internal: true
+  # (эти сенсоры по дизайну — входы для логики ESPHome, не публикуются обратно в HA).
+  # Без этой строки sensor.{node}_current_co2 не появится в HA, и карточка/график не увидят его.
   - platform: homeassistant
     name: "Current CO2"
     id: current_co2
@@ -77,6 +80,7 @@ sensor:
     device_class: "carbon_dioxide"
     state_class: "measurement"
     accuracy_decimals: 0
+    internal: false
 
   # Целевой CO₂ как sensor — зеркало number.target_co2 для отображения на графиках.
   #
