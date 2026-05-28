@@ -66,7 +66,6 @@ sensor:
     icon: "mdi:fan"
     state_class: "measurement"
     accuracy_decimals: 0
-    internal: false
 
   # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID
   - platform: homeassistant
@@ -78,7 +77,6 @@ sensor:
     device_class: "carbon_dioxide"
     state_class: "measurement"
     accuracy_decimals: 0
-    internal: false
 
   # Целевой CO₂ как сенсор — нужен только для отображения уставки на графиках рядом с current_co2
   - platform: template
@@ -100,7 +98,6 @@ climate:
   - platform: tion
     id: tion_climate_current
     internal: true
-    name: "Climate Current"
     on_state:
       - if:
           condition:
@@ -321,6 +318,9 @@ switch:
 
   # silent_mode — фиксирует скорость на 1 поверх PID.
   # При выключении возвращает скорость к min_fan_speed.
+  # При включении дополнительно выключает PID, чтобы он не накапливал integral
+  # пока его выход игнорируется. При выключении — восстанавливает режим PID
+  # через sync_pid_mode (COOL/OFF в зависимости от min/max).
   - platform: template
     name: "Silent Mode"
     icon: "mdi:weather-night"
@@ -336,6 +336,11 @@ switch:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: 1
+            - if:
+                condition:
+                  lambda: 'return id(pid_co2).mode != CLIMATE_MODE_OFF;'
+                then:
+                  - climate.control: { id: pid_co2, mode: 'OFF' }
     on_turn_off:
       - logger.log: "switch.silent_mode: turn_off_action"
       - if:
@@ -345,6 +350,10 @@ switch:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return id(min_fan_speed).state;'
+            - script.execute:
+                id: sync_pid_mode
+                min: !lambda 'return int(id(min_fan_speed).state);'
+                max: !lambda 'return int(id(max_fan_speed).state);'
 
 # Числовые сущности для задания целевого CO₂, температуры нагрева и допустимого диапазона скоростей
 number:
