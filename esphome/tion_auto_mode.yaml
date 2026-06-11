@@ -10,6 +10,9 @@
 #     рост выходного сигнала → рост скорости.
 #   - Скорость зажимается в диапазон [min_fan_speed, max_fan_speed].
 #     Если min == max — PID отключается, скорость фиксируется.
+#   - Если CO₂ недоступен (NAN) или вне диапазона 350..6000 ppm — PID не
+#     меняет скорость, бризер удерживает текущую до восстановления показаний.
+#     Ручная правка min/max при этом применяется к железу напрямую.
 #   - В тихом режиме (silent_mode) скорость фиксируется на 1.
 #   - Все команды к бризеру проходят через script set_fan_speed, который
 #     отправляет climate.control только при изменении скорости.
@@ -207,13 +210,25 @@ output:
                       id: set_fan_speed
                       fan_speed: 1
                 else:
-                  - script.execute:
-                      id: set_fan_speed
-                      fan_speed: !lambda |-
-                        const int min_speed = static_cast<int>(std::lround(id(min_fan_speed).state));
-                        const int max_speed = static_cast<int>(std::lround(id(max_fan_speed).state));
-                        const int requested = static_cast<int>(std::lround(6.0f * state));
-                        return std::max<int>(min_speed, std::min<int>(max_speed, requested));
+                  # PID-скорость применяется ТОЛЬКО при достоверном CO₂.
+                  # Если сенсор недоступен (NAN) или вернул неправдоподобное
+                  # значение (вне 350..6000 ppm) — команд не шлём, бризер
+                  # удерживает текущую скорость до восстановления показаний.
+                  # Ручное изменение min/max при этом продолжает работать —
+                  # оно идёт мимо этой ветки, напрямую через set_fan_speed.
+                  - if:
+                      condition:
+                        lambda: |-
+                          const float co2 = id(current_co2).state;
+                          return !std::isnan(co2) && co2 >= 350.0f && co2 <= 6000.0f;
+                      then:
+                        - script.execute:
+                            id: set_fan_speed
+                            fan_speed: !lambda |-
+                              const int min_speed = static_cast<int>(std::lround(id(min_fan_speed).state));
+                              const int max_speed = static_cast<int>(std::lround(id(max_fan_speed).state));
+                              const int requested = static_cast<int>(std::lround(6.0f * state));
+                              return std::max<int>(min_speed, std::min<int>(max_speed, requested));
 
 # Применяет скорость к tion_climate_current только если она изменилась —
 # чтобы не слать лишние команды бризеру при каждом срабатывании PID.
@@ -460,6 +475,18 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
+      # Ручной выбор фиксированной скорости (min == max) детерминированно
+      # применяется к железу, независимо от направления и состояния CO₂.
+      - if:
+          condition:
+            and:
+              - switch.is_on: power_mode
+              - switch.is_off: silent_mode
+              - lambda: 'return int(x) == int(id(max_fan_speed).state);'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return int(x);'
       - if:
           condition:
             switch.is_on: power_mode
@@ -500,6 +527,18 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
+      # Ручной выбор фиксированной скорости (min == max) детерминированно
+      # применяется к железу, независимо от направления и состояния CO₂.
+      - if:
+          condition:
+            and:
+              - switch.is_on: power_mode
+              - switch.is_off: silent_mode
+              - lambda: 'return int(x) == int(id(min_fan_speed).state);'
+          then:
+            - script.execute:
+                id: set_fan_speed
+                fan_speed: !lambda 'return int(x);'
       - if:
           condition:
             switch.is_on: power_mode
