@@ -475,18 +475,6 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
-      # Ручной выбор фиксированной скорости (min == max) детерминированно
-      # применяется к железу, независимо от направления и состояния CO₂.
-      - if:
-          condition:
-            and:
-              - switch.is_on: power_mode
-              - switch.is_off: silent_mode
-              - lambda: 'return int(x) == int(id(max_fan_speed).state);'
-          then:
-            - script.execute:
-                id: set_fan_speed
-                fan_speed: !lambda 'return int(x);'
       - if:
           condition:
             switch.is_on: power_mode
@@ -527,18 +515,6 @@ number:
             - script.execute:
                 id: set_fan_speed
                 fan_speed: !lambda 'return x;'
-      # Ручной выбор фиксированной скорости (min == max) детерминированно
-      # применяется к железу, независимо от направления и состояния CO₂.
-      - if:
-          condition:
-            and:
-              - switch.is_on: power_mode
-              - switch.is_off: silent_mode
-              - lambda: 'return int(x) == int(id(min_fan_speed).state);'
-          then:
-            - script.execute:
-                id: set_fan_speed
-                fan_speed: !lambda 'return int(x);'
       - if:
           condition:
             switch.is_on: power_mode
