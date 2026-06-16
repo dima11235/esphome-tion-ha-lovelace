@@ -510,7 +510,7 @@ switch:
           then:
             - script.execute:
                 id: set_fan_speed
-                fan_speed: !lambda 'return id(min_fan_speed).state;'
+                fan_speed: !lambda 'return int(id(min_fan_speed).state);'
             - script.execute:
                 id: sync_pid_mode
                 min: !lambda 'return int(id(min_fan_speed).state);'
