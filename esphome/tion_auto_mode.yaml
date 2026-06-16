@@ -301,17 +301,26 @@ output:
                       id: set_fan_speed
                       fan_speed: 1
                 else:
-                  # PID-скорость применяется ТОЛЬКО при достоверном CO₂.
-                  # Если сенсор недоступен (NAN) или вернул неправдоподобное
-                  # значение (вне 350..6000 ppm) — команд не шлём, бризер
-                  # удерживает текущую скорость до восстановления показаний.
-                  # Ручное изменение min/max при этом продолжает работать —
-                  # оно идёт мимо этой ветки, напрямую через set_fan_speed.
+                  # PID-скорость применяется ТОЛЬКО при достоверном CO₂ и
+                  # активном PID (mode == COOL).
+                  #   - CO₂: если сенсор недоступен (NAN) или вернул
+                  #     неправдоподобное значение (вне 350..6000 ppm) — команд
+                  #     не шлём, бризер удерживает текущую скорость.
+                  #   - pid_co2 == COOL ОБЯЗАТЕЛЬНО: выключение PID (climate.control
+                  #     pid_co2 OFF, например в power_mode.turn_off_action) само
+                  #     триггерит write_action. Без этой проверки в фиксированном
+                  #     режиме (min==max) clamp дал бы min==max и set_fan_speed
+                  #     снова включил бы бризер при выключении. Выход выключенного
+                  #     PID применять нельзя.
+                  # Ручное изменение min/max идёт мимо этой ветки, напрямую через
+                  # set_fan_speed в number.set_action.
                   - if:
                       condition:
-                        lambda: |-
-                          const float co2 = id(current_co2).state;
-                          return !std::isnan(co2) && co2 >= 350.0f && co2 <= 6000.0f;
+                        and:
+                          - lambda: |-
+                              const float co2 = id(current_co2).state;
+                              return !std::isnan(co2) && co2 >= 350.0f && co2 <= 6000.0f;
+                          - lambda: 'return id(pid_co2).mode == CLIMATE_MODE_COOL;'
                       then:
                         - script.execute:
                             id: set_fan_speed
