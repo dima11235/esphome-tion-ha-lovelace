@@ -121,13 +121,22 @@ sensor:
                         then:
                           - switch.turn_off: power_mode
                   else:
-                    - lambda: |-
-                        id(min_fan_speed).publish_state(x);
-                        id(max_fan_speed).publish_state(x);
-                    - script.execute:
-                        id: sync_pid_mode
-                        min: !lambda 'return int(x);'
-                        max: !lambda 'return int(x);'
+                    # В тихом режиме смену скорости с пульта игнорируем: silent_mode
+                    # всё равно держит скорость 1 и перебьёт её при следующем
+                    # обновлении CO₂. Тронуть min/max здесь — значит испортить
+                    # диапазон, к которому вернёмся при выключении silent_mode.
+                    # last_set_speed выше уже обновлён (отражает реальную скорость).
+                    - if:
+                        condition:
+                          switch.is_off: silent_mode
+                        then:
+                          - lambda: |-
+                              id(min_fan_speed).publish_state(x);
+                              id(max_fan_speed).publish_state(x);
+                          - script.execute:
+                              id: sync_pid_mode
+                              min: !lambda 'return int(x);'
+                              max: !lambda 'return int(x);'
 
   # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID.
   # internal: false ОБЯЗАТЕЛЬНО: для platform: homeassistant дефолт — internal: true
