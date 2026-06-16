@@ -105,9 +105,13 @@ sensor:
         - if:
             condition:
               and:
+                # расхождение с нашим намерением = действие пультом...
                 - lambda: 'return int(x) != id(last_set_speed);'
+                # ...но только вне окна устаканивания (иначе это эхо нашей команды)
                 - lambda: 'return millis() >= id(fan_speed_settle_until);'
             then:
+              # синхронизируем намерение с фактом, чтобы повторные отчёты железа
+              # с этой же скоростью больше не считались действием пультом
               - globals.set:
                   id: last_set_speed
                   value: !lambda 'return int(x);'
@@ -115,6 +119,8 @@ sensor:
                   condition:
                     lambda: 'return int(x) == 0;'
                   then:
+                    # пульт остановил вентилятор → выключаем бризер.
+                    # guard power_mode: не дёргаем switch, если он уже выключен
                     - if:
                         condition:
                           switch.is_on: power_mode
@@ -309,12 +315,16 @@ output:
 # чтобы не слать лишние команды бризеру при каждом срабатывании PID.
 # При fan_speed > 0 передаёт режим (HEAT/FAN_ONLY) и температуру нагрева.
 # При fan_speed == 0 переводит климат в режим OFF.
+# Каждый вызов фиксирует намерение в last_set_speed — это «эталон», с которым
+# on_value сравнивает отчёты железа, чтобы отличить наши команды от пульта.
 script:
   - id: set_fan_speed
     parameters:
       fan_speed: int
     then:
       - logger.log: "script.set_fan_speed"
+      # Фиксируем намерение ДО проверки изменения: даже если команда не уйдёт
+      # (скорость уже верная), last_set_speed должен отражать, что мы «хотели».
       - globals.set:
           id: last_set_speed
           value: !lambda 'return fan_speed;'
