@@ -61,13 +61,21 @@
 
 ### ESPHome package: Automatic fan control for Tion breezer (CO2 driven)
 
+globals:
+  # Последняя скорость, которую алгоритм отправил на бризер.
+  # Если железо сообщает другое значение — значит, скорость изменили с пульта.
+  - id: last_set_speed
+    type: int
+    restore_value: yes
+    initial_value: '-1'
 
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
   # Текущая скорость вентилятора — читается напрямую с бризера через Tion-компонент.
-  # on_value: если новая скорость выходит за диапазон [min, max] — значит, её поставил
-  # пульт (PID работает строго внутри диапазона). Выставляем min=max=speed и
-  # отключаем PID. В тихом режиме не обновляем — там speed=1 может быть ниже min.
+  # on_value: сравниваем с last_set_speed — последним значением, которое алгоритм сам
+  # отправил на железо. Расхождение означает изменение с пульта:
+  #   speed == 0 → пульт выключил бризер → power_mode = OFF
+  #   speed > 0  → пульт сменил скорость → min = max = speed, PID отключается
   - platform: tion
     name: "Fan Speed"
     type: fan_speed
@@ -79,21 +87,28 @@ sensor:
       then:
         - if:
             condition:
-              lambda: |-
-                const int s = int(x);
-                const int lo = int(id(min_fan_speed).state);
-                const int hi = int(id(max_fan_speed).state);
-                return s > 0
-                    && !id(silent_mode).state
-                    && (s < lo || s > hi);
+              lambda: 'return int(x) != id(last_set_speed);'
             then:
-              - lambda: |-
-                  id(min_fan_speed).publish_state(x);
-                  id(max_fan_speed).publish_state(x);
-              - script.execute:
-                  id: sync_pid_mode
-                  min: !lambda 'return int(x);'
-                  max: !lambda 'return int(x);'
+              - globals.set:
+                  id: last_set_speed
+                  value: !lambda 'return int(x);'
+              - if:
+                  condition:
+                    lambda: 'return int(x) == 0;'
+                  then:
+                    - if:
+                        condition:
+                          switch.is_on: power_mode
+                        then:
+                          - switch.turn_off: power_mode
+                  else:
+                    - lambda: |-
+                        id(min_fan_speed).publish_state(x);
+                        id(max_fan_speed).publish_state(x);
+                    - script.execute:
+                        id: sync_pid_mode
+                        min: !lambda 'return int(x);'
+                        max: !lambda 'return int(x);'
 
   # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID.
   # internal: false ОБЯЗАТЕЛЬНО: для platform: homeassistant дефолт — internal: true
@@ -265,6 +280,9 @@ script:
       fan_speed: int
     then:
       - logger.log: "script.set_fan_speed"
+      - globals.set:
+          id: last_set_speed
+          value: !lambda 'return fan_speed;'
       - if:
           condition:
             lambda: 'return fan_speed != int(id(current_fan_speed).state);'
