@@ -22,6 +22,9 @@
 #       · heater_mode   — синхронизируется при смене режима HEAT/FAN_ONLY в железе
 #       · heater_temperature — синхронизируется при смене целевой температуры в железе
 #       · power_mode    — включается если железо работает, а switch выключен
+#   - current_fan_speed → on_value:
+#       · если скорость вышла за диапазон [min, max] — пульт поменял скорость;
+#         выставляем min=max=speed, отключаем PID
 #   - min_fan_speed.set_action / max_fan_speed.set_action:
 #       · PID включается (COOL) если min != max и power включён
 #       · PID выключается (OFF) если min == max
@@ -61,7 +64,10 @@
 
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
-  # Текущая скорость вентилятора — читается напрямую с бризера через Tion-компонент
+  # Текущая скорость вентилятора — читается напрямую с бризера через Tion-компонент.
+  # on_value: если новая скорость выходит за диапазон [min, max] — значит, её поставил
+  # пульт (PID работает строго внутри диапазона). Выставляем min=max=speed и
+  # отключаем PID. В тихом режиме не обновляем — там speed=1 может быть ниже min.
   - platform: tion
     name: "Fan Speed"
     type: fan_speed
@@ -69,6 +75,25 @@ sensor:
     icon: "mdi:fan"
     state_class: "measurement"
     accuracy_decimals: 0
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                const int s = int(x);
+                const int lo = int(id(min_fan_speed).state);
+                const int hi = int(id(max_fan_speed).state);
+                return s > 0
+                    && !id(silent_mode).state
+                    && (s < lo || s > hi);
+            then:
+              - lambda: |-
+                  id(min_fan_speed).publish_state(x);
+                  id(max_fan_speed).publish_state(x);
+              - script.execute:
+                  id: sync_pid_mode
+                  min: !lambda 'return int(x);'
+                  max: !lambda 'return int(x);'
 
   # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID.
   # internal: false ОБЯЗАТЕЛЬНО: для platform: homeassistant дефолт — internal: true
