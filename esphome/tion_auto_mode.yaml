@@ -201,10 +201,17 @@ climate:
       # при этом climate переходит в OFF — и явный switch.turn_off: power_mode
       # выключал бы бризер целиком, хотя нужно лишь остановить вентилятор.
       # Штатное выключение бризера при скорости 0 / OFF происходит и без этого.
+      #
+      # Условие fan_speed > 0 обязательно: при выключении с пульта железо может
+      # прислать переходное состояние, где fan_speed уже 0, но mode ещё не OFF
+      # (FAN_ONLY/HEAT). Без этой проверки on_value(0) выключал бы power_mode,
+      # а следующий on_state тут же включал его обратно — бризер «не выключался».
+      # Бризер реально работает только когда вентилятор крутится.
       - if:
           condition:
             and:
               - lambda: 'return id(tion_climate_current).mode != CLIMATE_MODE_OFF;'
+              - lambda: 'return int(id(current_fan_speed).state) > 0;'
               - switch.is_off: power_mode
           then:
             - logger.log: "climate.tion_climate_current: on_state: turn power_mode on"
