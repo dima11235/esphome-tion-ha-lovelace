@@ -19,15 +19,18 @@
 #
 # Синхронизация состояния (событийная, без поллинга):
 #   - tion_climate_current (internal дубликат климата) → on_state:
-#       · heater_mode   — синхронизируется при смене режима HEAT/FAN_ONLY в железе
+#       · heater_mode   — синхронизируется (publish_state) при смене HEAT/FAN_ONLY
 #       · heater_temperature — синхронизируется при смене целевой температуры в железе
-#       · power_mode    — включается если железо работает, а switch выключен
+#       · power_mode OFF — при mode == OFF от пульта (надёжный сигнал выключения,
+#         в отличие от fan == 0, который бывает и у работающего бризера)
+#       · power_mode ON  — при mode != OFF и fan > 0 (бризер включили с пульта)
 #   - current_fan_speed → on_value:
 #       · скорость от железа сравнивается с last_set_speed (последним, что
-#         отправил алгоритм). Расхождение = изменение с пульта:
-#         speed 0 → power_mode OFF; speed > 0 → min=max=speed, PID off.
-#       · окно устаканивания (fan_speed_settle_until) гасит ложные срабатывания
-#         от эхо старой скорости, пока железо догоняет нашу команду.
+#         отправил алгоритм). Расхождение при speed > 0 = пульт сменил скорость
+#         → min = max = speed, PID off.
+#   - окно устаканивания (fan_speed_settle_until) гасит ложные срабатывания от эха:
+#     после нашей команды железо несколько секунд отдаёт ещё старое состояние.
+#     last_set_speed != 0 отличает выключение пультом от «0 выставили мы сами».
 #   - min_fan_speed.set_action / max_fan_speed.set_action:
 #       · PID включается (COOL) если min != max и power включён
 #       · PID выключается (OFF) если min == max
@@ -85,10 +88,12 @@ globals:
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
   # Текущая скорость вентилятора — читается напрямую с бризера через Tion-компонент.
-  # on_value: сравниваем с last_set_speed — последним значением, которое алгоритм сам
-  # отправил на железо. Расхождение означает изменение с пульта:
-  #   speed == 0 → пульт выключил бризер → power_mode = OFF
-  #   speed > 0  → пульт сменил скорость → min = max = speed, PID отключается
+  # on_value ловит ТОЛЬКО смену скорости с пульта (speed > 0). Выключение бризера
+  # обрабатывается в climate.on_state по mode == OFF — это надёжный сигнал, тогда как
+  # fan == 0 бывает и при работающем бризере (PID остановил вентилятор).
+  #
+  # Логика: скорость от железа сравнивается с last_set_speed (последним, что отправил
+  # алгоритм). Расхождение = пульт сменил скорость → min = max = speed, PID off.
   #
   # Окно устаканивания (fan_speed_settle_until): после нашей команды железо
   # несколько секунд эхит ещё старую скорость, пока догоняет команду. В этом окне
@@ -109,40 +114,28 @@ sensor:
                 - lambda: 'return int(x) != id(last_set_speed);'
                 # ...но только вне окна устаканивания (иначе это эхо нашей команды)
                 - lambda: 'return millis() >= id(fan_speed_settle_until);'
+                # speed 0 — это не смена скорости, а остановка/выключение;
+                # выключение обрабатывается в on_state по mode == OFF
+                - lambda: 'return int(x) > 0;'
+                # в тихом режиме смену скорости с пульта игнорируем: silent_mode
+                # всё равно держит 1 и перебьёт её при следующем обновлении CO₂.
+                # Тронуть min/max здесь — испортить диапазон, к которому вернёмся
+                # при выключении silent_mode.
+                - switch.is_off: silent_mode
             then:
               # синхронизируем намерение с фактом, чтобы повторные отчёты железа
               # с этой же скоростью больше не считались действием пультом
               - globals.set:
                   id: last_set_speed
                   value: !lambda 'return int(x);'
-              - if:
-                  condition:
-                    lambda: 'return int(x) == 0;'
-                  then:
-                    # пульт остановил вентилятор → выключаем бризер.
-                    # guard power_mode: не дёргаем switch, если он уже выключен
-                    - if:
-                        condition:
-                          switch.is_on: power_mode
-                        then:
-                          - switch.turn_off: power_mode
-                  else:
-                    # В тихом режиме смену скорости с пульта игнорируем: silent_mode
-                    # всё равно держит скорость 1 и перебьёт её при следующем
-                    # обновлении CO₂. Тронуть min/max здесь — значит испортить
-                    # диапазон, к которому вернёмся при выключении silent_mode.
-                    # last_set_speed выше уже обновлён (отражает реальную скорость).
-                    - if:
-                        condition:
-                          switch.is_off: silent_mode
-                        then:
-                          - lambda: |-
-                              id(min_fan_speed).publish_state(x);
-                              id(max_fan_speed).publish_state(x);
-                          - script.execute:
-                              id: sync_pid_mode
-                              min: !lambda 'return int(x);'
-                              max: !lambda 'return int(x);'
+              # пульт сменил скорость → фиксируем её: min = max = speed, PID off
+              - lambda: |-
+                  id(min_fan_speed).publish_state(x);
+                  id(max_fan_speed).publish_state(x);
+              - script.execute:
+                  id: sync_pid_mode
+                  min: !lambda 'return int(x);'
+                  max: !lambda 'return int(x);'
 
   # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID.
   # internal: false ОБЯЗАТЕЛЬНО: для platform: homeassistant дефолт — internal: true
@@ -192,6 +185,12 @@ climate:
     id: tion_climate_current
     internal: true
     on_state:
+      # Синхронизация heater_mode с железом через publish_state, а НЕ turn_on/off.
+      # turn_on/off heater_mode безусловно включают power_mode (намеренно — для
+      # ручного нажатия на карточке). Но здесь это лишь отражение состояния железа:
+      # если при выключении бризер проходит через промежуточный HEAT↔FAN_ONLY,
+      # turn_on/off включил бы power_mode обратно. publish_state меняет состояние
+      # switch без выполнения его action — ручное нажатие на карточке не затронуто.
       - if:
           condition:
             and:
@@ -199,7 +198,7 @@ climate:
               - switch.is_off: heater_mode
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode on"
-            - switch.turn_on: heater_mode
+            - lambda: 'id(heater_mode).publish_state(true);'
       - if:
           condition:
             and:
@@ -207,7 +206,7 @@ climate:
               - switch.is_on: heater_mode
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode off"
-            - switch.turn_off: heater_mode
+            - lambda: 'id(heater_mode).publish_state(false);'
       # heater_temperature синхронизируется ТОЛЬКО когда железо в режиме HEAT —
       # это сознательное ограничение под специфику пульта и протокола Tion:
       #   - в режиме FAN_ONLY поле target_temperature в пакете состояния
@@ -230,22 +229,33 @@ climate:
             - number.set:
                 id: heater_temperature
                 value: !lambda 'return id(tion_climate_current).target_temperature;'
-      # Обрабатывается только включение бризера. Выключение по CLIMATE_MODE_OFF
-      # здесь намеренно не делаем: PID в авто-режиме может выставить скорость 0,
-      # при этом climate переходит в OFF — и явный switch.turn_off: power_mode
-      # выключал бы бризер целиком, хотя нужно лишь остановить вентилятор.
-      # Штатное выключение бризера при скорости 0 / OFF происходит и без этого.
-      #
-      # Условие fan_speed > 0 обязательно: при выключении с пульта железо может
-      # прислать переходное состояние, где fan_speed уже 0, но mode ещё не OFF
-      # (FAN_ONLY/HEAT). Без этой проверки on_value(0) выключал бы power_mode,
-      # а следующий on_state тут же включал его обратно — бризер «не выключался».
-      # Бризер реально работает только когда вентилятор крутится.
+      # Выключение бризера с пульта: надёжный сигнал — mode == OFF (а НЕ fan == 0,
+      # который бывает и при работающем бризере, когда PID остановил вентилятор).
+      #   - last_set_speed != 0: отличает выключение пультом от ситуации «0 выставили
+      #     мы сами» (power_mode.turn_off или PID при min=0) — там power трогать не надо.
+      #   - settle: внутри окна mode == OFF может быть эхом нашей же команды (например,
+      #     эхо старого OFF сразу после включения) — игнорируем.
+      - if:
+          condition:
+            and:
+              - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_OFF;'
+              - switch.is_on: power_mode
+              - lambda: 'return id(last_set_speed) != 0;'
+              - lambda: 'return millis() >= id(fan_speed_settle_until);'
+          then:
+            - logger.log: "climate.tion_climate_current: on_state: turn power_mode off (remote)"
+            - switch.turn_off: power_mode
+      # Включение бризера с пульта: mode != OFF и вентилятор реально крутится.
+      #   - fan_speed > 0: переходное состояние при выключении (mode ещё не OFF,
+      #     но fan уже 0) не должно ложно включать power_mode обратно.
+      #   - settle: эхо старого рабочего состояния сразу после нашего выключения
+      #     не должно включать бризер заново.
       - if:
           condition:
             and:
               - lambda: 'return id(tion_climate_current).mode != CLIMATE_MODE_OFF;'
               - lambda: 'return int(id(current_fan_speed).state) > 0;'
+              - lambda: 'return millis() >= id(fan_speed_settle_until);'
               - switch.is_off: power_mode
           then:
             - logger.log: "climate.tion_climate_current: on_state: turn power_mode on"
@@ -410,6 +420,13 @@ switch:
           max: !lambda 'return int(id(max_fan_speed).state);'
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
+      # Взводим окно устаканивания: после выключения железо несколько секунд
+      # эхит ещё старое рабочее состояние (mode != OFF, fan > 0). Без этого окна
+      # on_state включал бы power_mode обратно. set_fan_speed ниже взведёт окно
+      # только если реально пошлёт команду (current != 0), поэтому взводим явно.
+      - globals.set:
+          id: fan_speed_settle_until
+          value: !lambda 'return millis() + 5000;'
       - climate.control:
           id: pid_co2
           mode: 'OFF'
