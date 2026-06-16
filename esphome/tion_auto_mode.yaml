@@ -23,8 +23,11 @@
 #       · heater_temperature — синхронизируется при смене целевой температуры в железе
 #       · power_mode    — включается если железо работает, а switch выключен
 #   - current_fan_speed → on_value:
-#       · если скорость вышла за диапазон [min, max] — пульт поменял скорость;
-#         выставляем min=max=speed, отключаем PID
+#       · скорость от железа сравнивается с last_set_speed (последним, что
+#         отправил алгоритм). Расхождение = изменение с пульта:
+#         speed 0 → power_mode OFF; speed > 0 → min=max=speed, PID off.
+#       · окно устаканивания (fan_speed_settle_until) гасит ложные срабатывания
+#         от эхо старой скорости, пока железо догоняет нашу команду.
 #   - min_fan_speed.set_action / max_fan_speed.set_action:
 #       · PID включается (COOL) если min != max и power включён
 #       · PID выключается (OFF) если min == max
@@ -69,6 +72,16 @@ globals:
     restore_value: yes
     initial_value: '-1'
 
+  # millis() до которого on_value НЕ интерпретирует расхождение как «пульт».
+  # Взводится при отправке команды смены скорости: пока железо догоняет команду,
+  # оно несколько секунд эхит ещё старую скорость. Без этого окна такой эхо-отчёт
+  # ложно опознавался бы как ручное изменение с пульта → min=max=старая, PID off.
+  # Тот же приём, что settle_until в tion_intake_3s/4s.yaml.
+  - id: fan_speed_settle_until
+    type: uint32_t
+    restore_value: no
+    initial_value: '0'
+
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
   # Текущая скорость вентилятора — читается напрямую с бризера через Tion-компонент.
@@ -76,6 +89,10 @@ sensor:
   # отправил на железо. Расхождение означает изменение с пульта:
   #   speed == 0 → пульт выключил бризер → power_mode = OFF
   #   speed > 0  → пульт сменил скорость → min = max = speed, PID отключается
+  #
+  # Окно устаканивания (fan_speed_settle_until): после нашей команды железо
+  # несколько секунд эхит ещё старую скорость, пока догоняет команду. В этом окне
+  # расхождение игнорируем — иначе наш же эхо-отчёт ложно опознавался бы как пульт.
   - platform: tion
     name: "Fan Speed"
     type: fan_speed
@@ -87,7 +104,9 @@ sensor:
       then:
         - if:
             condition:
-              lambda: 'return int(x) != id(last_set_speed);'
+              and:
+                - lambda: 'return int(x) != id(last_set_speed);'
+                - lambda: 'return millis() >= id(fan_speed_settle_until);'
             then:
               - globals.set:
                   id: last_set_speed
@@ -294,6 +313,13 @@ script:
           condition:
             lambda: 'return fan_speed != int(id(current_fan_speed).state);'
           then:
+            # Реально меняем скорость → взводим окно устаканивания: пока железо
+            # догоняет команду и эхит старую скорость, on_value не примет эхо за пульт.
+            # Взводим ТОЛЬКО здесь (не выше): иначе регулярные вызовы PID без смены
+            # скорости держали бы окно открытым вечно и пульт не детектировался бы.
+            - globals.set:
+                id: fan_speed_settle_until
+                value: !lambda 'return millis() + 5000;'
             - if:
                 condition:
                   lambda: 'return fan_speed > 0;'
