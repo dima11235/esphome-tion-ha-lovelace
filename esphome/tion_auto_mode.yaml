@@ -67,6 +67,61 @@
 
 ### ESPHome package: Automatic fan control for Tion breezer (CO2 driven)
 
+# ---------------------------------------------------------------------------
+# Защита от ложного выключения power_mode после рестарта HA / ребута ESP.
+#
+# Симптом: после перезагрузки бризер мог остаться выключенным и не включиться.
+# Причина: при старте power_mode восстанавливается в ON и его turn_on_action
+# выполняется СЛИШКОМ РАНО — железо Tion (UART/BLE) ещё не готово, команда
+# включения теряется. Железо затем поднимается выключенным (mode == OFF, fan 0),
+# а обработчик tion_climate_current.on_state трактует этот OFF как «выключение
+# с пульта» и гасит power_mode. Самовосстановления нет — ветка включения в
+# on_state требует fan > 0, чего при выключенном бризере не происходит.
+#
+# Фикс:
+#   - on_boot (после готовности железа): взвести окно устаканивания, чтобы
+#     on_state не принял начальный OFF за пульт, и ПЕРЕ-ПРИМЕНИТЬ включение,
+#     если power_mode восстановлен в ON, но железо поднялось выключенным;
+#   - on_client_connected: то же окно — на случай churn при переподключении HA.
+# ---------------------------------------------------------------------------
+esphome:
+  on_boot:
+    # Низкий приоритет: выполняется после инициализации компонентов.
+    - priority: -100
+      then:
+        # Даём tion-компоненту установить связь с железом и отдать реальное
+        # состояние, прежде чем принимать решения по power_mode.
+        - delay: 10s
+        - globals.set:
+            id: fan_speed_settle_until
+            value: !lambda 'return millis() + 30000;'
+        - if:
+            condition:
+              switch.is_on: power_mode
+            then:
+              # power_mode говорит «включён». Если железо после старта оказалось
+              # выключенным (fan 0) — пере-применяем включение, иначе бризер
+              # останется off, а on_state позже погасит и сам power_mode.
+              - if:
+                  condition:
+                    lambda: 'return int(id(current_fan_speed).state) == 0;'
+                  then:
+                    - script.execute:
+                        id: set_fan_speed
+                        fan_speed: !lambda 'return int(id(min_fan_speed).state);'
+              - script.execute:
+                  id: sync_pid_mode
+                  min: !lambda 'return int(id(min_fan_speed).state);'
+                  max: !lambda 'return int(id(max_fan_speed).state);'
+
+api:
+  on_client_connected:
+    # Реконнект HA может совпасть с churn состояния — короткое окно не даёт
+    # on_state принять переходный OFF за выключение с пульта.
+    - globals.set:
+        id: fan_speed_settle_until
+        value: !lambda 'return millis() + 15000;'
+
 globals:
   # Последняя скорость, которую алгоритм отправил на бризер.
   # Если железо сообщает другое значение — значит, скорость изменили с пульта.
