@@ -46,6 +46,7 @@
 #   sensor.fan_speed           — текущая скорость вентилятора
 #   sensor.current_co2         — текущий CO₂ (зеркало внешнего сенсора)
 #   sensor.target_co2_sensor   — целевой CO₂ (для отображения на графиках)
+#   sensor.firmware_build      — версия пакета + версия ESPHome + время сборки
 #
 # Требует:
 #   substitutions.auto_mode_co2_sensor — entity_id сенсора CO₂ в HA
@@ -66,6 +67,19 @@
 #       - esphome/tion_others.yaml      # Wi-Fi диагностика (опционально)
 
 ### ESPHome package: Automatic fan control for Tion breezer (CO2 driven)
+
+substitutions:
+  # Версия пакета. Публикуется в HA как sensor.<node>_firmware_build вместе со
+  # временем компиляции — чтобы по состоянию сущности сразу видеть, что именно
+  # залито на устройство, и не сверять поведение с git вслепую.
+  # Поднимать вручную при изменении логики пакета.
+  tion_auto_mode_version: "2026.07.12"
+
+  # Аварийный диапазон скоростей. Используется и как initial_value у
+  # number.min/max_fan_speed, и как fallback в on_boot, если restore не вернул
+  # состояние (см. NaN-guard ниже).
+  default_min_fan_speed: "1"
+  default_max_fan_speed: "2"
 
 # ---------------------------------------------------------------------------
 # Защита от ложного выключения power_mode после рестарта HA / ребута ESP.
@@ -89,6 +103,29 @@ esphome:
     # Низкий приоритет: выполняется после инициализации компонентов.
     - priority: -100
       then:
+        # NaN-guard диапазона скоростей. ДО задержки и до любых решений.
+        #
+        # Наблюдение (ESP8266, 11-12.07.2026, бризер Ани): после ребута ESP
+        # number.min/max_fan_speed поднимаются БЕЗ состояния, несмотря на
+        # restore_value: true — в HA это `unknown`, в лямбдах NaN. Дальше вся
+        # логика ниже читает min_fan_speed, а int(NaN) — UB: on_boot слал
+        # мусорную скорость, last_set_speed становился != 0, и через 30 с
+        # on_state принимал честный OFF железа за «выключили пультом» и гасил
+        # power_mode. Авто-режим умирал до следующего слота расписания.
+        #
+        # publish_state (а не number.set) — намеренно: нам нужно только валидное
+        # состояние для логики, дёргать set_action с железом на старте не надо.
+        # Точные значения всё равно вернёт re-apply из HA (scheduler.run_action)
+        # через пару минут после появления устройства.
+        - lambda: |-
+            if (std::isnan(id(min_fan_speed).state)) {
+              ESP_LOGW("tion_auto_mode", "min_fan_speed has no state after boot, falling back to default");
+              id(min_fan_speed).publish_state(${default_min_fan_speed});
+            }
+            if (std::isnan(id(max_fan_speed).state)) {
+              ESP_LOGW("tion_auto_mode", "max_fan_speed has no state after boot, falling back to default");
+              id(max_fan_speed).publish_state(${default_max_fan_speed});
+            }
         # Даём tion-компоненту установить связь с железом и отдать реальное
         # состояние, прежде чем принимать решения по power_mode.
         - delay: 10s
@@ -102,9 +139,13 @@ esphome:
               # power_mode говорит «включён». Если железо после старта оказалось
               # выключенным (fan 0) — пере-применяем включение, иначе бризер
               # останется off, а on_state позже погасит и сам power_mode.
+              # NaN у current_fan_speed = железо ещё не отчиталось: состояние
+              # неизвестно, решать по нему нельзя.
               - if:
                   condition:
-                    lambda: 'return int(id(current_fan_speed).state) == 0;'
+                    lambda: |-
+                      const float speed = id(current_fan_speed).state;
+                      return !std::isnan(speed) && int(speed) == 0;
                   then:
                     - script.execute:
                         id: set_fan_speed
@@ -160,6 +201,20 @@ globals:
     type: uint32_t
     restore_value: no
     initial_value: '0'
+
+# Диагностика: что за прошивка реально стоит на устройстве.
+# Версия пакета (substitution выше) + версия ESPHome + время компиляции, которое
+# для OTA фактически совпадает с моментом установки. Нужно, чтобы при разборе
+# инцидента не гадать, содержит ли залитая прошивка конкретный фикс.
+text_sensor:
+  - platform: template
+    name: "Firmware Build"
+    id: firmware_build
+    icon: "mdi:chip"
+    entity_category: diagnostic
+    update_interval: 60min
+    lambda: |-
+      return {"${tion_auto_mode_version} | esphome " ESPHOME_VERSION " | " __DATE__ " " __TIME__};
 
 # Сенсоры: текущая скорость, показания CO₂ и производное целевое значение
 sensor:
@@ -311,6 +366,10 @@ climate:
       #     мы сами» (power_mode.turn_off или PID при min=0) — там power трогать не надо.
       #   - settle: внутри окна mode == OFF может быть эхом нашей же команды (например,
       #     эхо старого OFF сразу после включения) — игнорируем.
+      #   - валидный диапазон: если min/max поднялись без состояния (NaN), on_boot
+      #     физически не мог включить бризер, и железо честно стоит в OFF. Это не
+      #     «выключили пультом» — гасить power_mode нельзя, иначе авто-режим умрёт
+      #     до следующего слота расписания (см. NaN-guard в on_boot).
       - if:
           condition:
             and:
@@ -318,6 +377,7 @@ climate:
               - switch.is_on: power_mode
               - lambda: 'return id(last_set_speed) != 0;'
               - lambda: 'return millis() >= id(fan_speed_settle_until);'
+              - lambda: 'return !std::isnan(id(min_fan_speed).state);'
           then:
             - logger.log: "climate.tion_climate_current: on_state: turn power_mode off (remote)"
             - switch.turn_off: power_mode
@@ -390,6 +450,9 @@ output:
                   #     PID применять нельзя.
                   # Ручное изменение min/max идёт мимо этой ветки, напрямую через
                   # set_fan_speed в number.set_action.
+                  #   - min/max: без валидного диапазона clamp ниже даёт мусор
+                  #     (int(NaN) — UB). Команду не шлём, бризер держит текущую
+                  #     скорость до восстановления диапазона.
                   - if:
                       condition:
                         and:
@@ -397,6 +460,9 @@ output:
                               const float co2 = id(current_co2).state;
                               return !std::isnan(co2) && co2 >= 350.0f && co2 <= 6000.0f;
                           - lambda: 'return id(pid_co2).mode == CLIMATE_MODE_COOL;'
+                          - lambda: |-
+                              return !std::isnan(id(min_fan_speed).state) &&
+                                     !std::isnan(id(max_fan_speed).state);
                       then:
                         - script.execute:
                             id: set_fan_speed
@@ -643,6 +709,11 @@ number:
   # min_fan_speed — нижняя граница диапазона. Если новое min > max, поднимает max следом.
   # Если min == max — PID отключается (фиксированная скорость).
   # Немедленно применяет скорость, если бризер работает и текущая скорость ниже нового min.
+  #
+  # ВНИМАНИЕ: на restore_value здесь полагаться нельзя. Наблюдалось (ESP8266),
+  # что после ребута min/max поднимаются вообще без состояния (в HA `unknown`,
+  # в лямбдах NaN) — поэтому в on_boot стоит NaN-guard, а все читатели min/max
+  # проверяют std::isnan. Не убирать эти проверки, «потому что restore_value: true».
   - platform: template
     name: "Min Fan Speed"
     icon: "mdi:fan"
@@ -652,7 +723,7 @@ number:
     step: 1
     optimistic: true
     restore_value: true
-    initial_value: 1
+    initial_value: ${default_min_fan_speed}
     set_action:
       - logger.log: "number.min_fan_speed: set_action"
       - if:
@@ -683,6 +754,7 @@ number:
 
   # max_fan_speed — верхняя граница диапазона. Если новый max < min, опускает min следом.
   # Немедленно применяет скорость, если бризер работает и текущая скорость выше нового max.
+  # Про ненадёжность restore_value — см. комментарий у min_fan_speed.
   - platform: template
     name: "Max Fan Speed"
     icon: "mdi:fan"
@@ -692,7 +764,7 @@ number:
     step: 1
     optimistic: true
     restore_value: true
-    initial_value: 2
+    initial_value: ${default_max_fan_speed}
     set_action:
       - logger.log: "number.max_fan_speed: set_action"
       - if:
