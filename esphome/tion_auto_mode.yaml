@@ -73,7 +73,7 @@ substitutions:
   # временем компиляции — чтобы по состоянию сущности сразу видеть, что именно
   # залито на устройство, и не сверять поведение с git вслепую.
   # Поднимать вручную при изменении логики пакета.
-  tion_auto_mode_version: "2026.07.12.1"
+  tion_auto_mode_version: "2026.07.12.2"
 
   # Аварийный диапазон скоростей. Используется и как initial_value у
   # number.min/max_fan_speed, и как fallback в on_boot, если restore не вернул
@@ -113,18 +113,44 @@ esphome:
         # on_state принимал честный OFF железа за «выключили пультом» и гасил
         # power_mode. Авто-режим умирал до следующего слота расписания.
         #
+        # Резервная пара globals хранится отдельно от number preferences. Если
+        # number restore снова вернул NaN, восстанавливаем последний реально
+        # заданный диапазон, не завися от доступности HA и имени расписания.
         # publish_state (а не number.set) — намеренно: нам нужно только валидное
         # состояние для логики, дёргать set_action с железом на старте не надо.
-        # Точные значения всё равно вернёт re-apply из HA (scheduler.run_action)
-        # через пару минут после появления устройства.
         - lambda: |-
-            if (std::isnan(id(min_fan_speed).state)) {
-              ESP_LOGW("tion_auto_mode", "min_fan_speed has no state after boot, falling back to default");
+            const float restored_min = id(min_fan_speed).state;
+            const float restored_max = id(max_fan_speed).state;
+            const bool restored_valid =
+              !std::isnan(restored_min) && !std::isnan(restored_max) &&
+              restored_min >= 0 && restored_min <= 6 &&
+              restored_max >= 0 && restored_max <= 6 &&
+              restored_min <= restored_max;
+
+            const int backup_min = id(saved_min_fan_speed);
+            const int backup_max = id(saved_max_fan_speed);
+            const bool backup_valid =
+              backup_min >= 0 && backup_min <= 6 &&
+              backup_max >= 0 && backup_max <= 6 &&
+              backup_min <= backup_max;
+
+            if (restored_valid) {
+              // Первый старт с новой версией также заполняет пустой backup.
+              id(saved_min_fan_speed) = static_cast<int>(std::lround(restored_min));
+              id(saved_max_fan_speed) = static_cast<int>(std::lround(restored_max));
+              ESP_LOGI("tion_auto_mode", "fan speed range restored: %d..%d",
+                       id(saved_min_fan_speed), id(saved_max_fan_speed));
+            } else if (backup_valid) {
+              ESP_LOGW("tion_auto_mode", "number range is invalid, restoring backup: %d..%d",
+                       backup_min, backup_max);
+              id(min_fan_speed).publish_state(backup_min);
+              id(max_fan_speed).publish_state(backup_max);
+            } else {
+              ESP_LOGW("tion_auto_mode", "number and backup ranges are invalid, using defaults");
               id(min_fan_speed).publish_state(${default_min_fan_speed});
-            }
-            if (std::isnan(id(max_fan_speed).state)) {
-              ESP_LOGW("tion_auto_mode", "max_fan_speed has no state after boot, falling back to default");
               id(max_fan_speed).publish_state(${default_max_fan_speed});
+              id(saved_min_fan_speed) = ${default_min_fan_speed};
+              id(saved_max_fan_speed) = ${default_max_fan_speed};
             }
         # Даём tion-компоненту установить связь с железом и отдать реальное
         # состояние, прежде чем принимать решения по power_mode.
@@ -188,6 +214,19 @@ api:
         value: !lambda 'return std::isnan(id(current_fan_speed).state);'
 
 globals:
+  # Резервная копия последнего валидного диапазона. Она использует отдельные
+  # preference keys и восстанавливает min/max, если template number после ребута
+  # поднялись как NaN. -1 означает, что backup ещё ни разу не был заполнен.
+  - id: saved_min_fan_speed
+    type: int
+    restore_value: yes
+    initial_value: '-1'
+
+  - id: saved_max_fan_speed
+    type: int
+    restore_value: yes
+    initial_value: '-1'
+
   # Последняя скорость, которую алгоритм отправил на бризер.
   # Если железо сообщает другое значение — значит, скорость изменили с пульта.
   - id: last_set_speed
@@ -794,6 +833,15 @@ number:
     initial_value: ${default_min_fan_speed}
     set_action:
       - logger.log: "number.min_fan_speed: set_action"
+      # Сохраняем согласованную пару: если min пересёк max, будущий max будет x.
+      - lambda: |-
+          const int new_min = static_cast<int>(std::lround(x));
+          const float current_max = id(max_fan_speed).state;
+          const int new_max = std::isnan(current_max) || x > current_max
+            ? new_min
+            : static_cast<int>(std::lround(current_max));
+          id(saved_min_fan_speed) = new_min;
+          id(saved_max_fan_speed) = new_max;
       - if:
           condition:
             lambda: |-
@@ -843,6 +891,15 @@ number:
     initial_value: ${default_max_fan_speed}
     set_action:
       - logger.log: "number.max_fan_speed: set_action"
+      # Сохраняем согласованную пару: если max пересёк min, будущий min будет x.
+      - lambda: |-
+          const int new_max = static_cast<int>(std::lround(x));
+          const float current_min = id(min_fan_speed).state;
+          const int new_min = std::isnan(current_min) || x < current_min
+            ? new_max
+            : static_cast<int>(std::lround(current_min));
+          id(saved_min_fan_speed) = new_min;
+          id(saved_max_fan_speed) = new_max;
       - if:
           condition:
             lambda: |-
