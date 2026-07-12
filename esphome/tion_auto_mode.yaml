@@ -73,32 +73,13 @@ substitutions:
   # временем компиляции — чтобы по состоянию сущности сразу видеть, что именно
   # залито на устройство, и не сверять поведение с git вслепую.
   # Поднимать вручную при изменении логики пакета.
-  tion_auto_mode_version: "2026.07.12.3"
+  tion_auto_mode_version: "2026.07.13.1"
 
   # Аварийный диапазон скоростей. Используется и как initial_value у
   # number.min/max_fan_speed, и как fallback в on_boot, если restore не вернул
   # состояние (см. NaN-guard ниже).
   default_min_fan_speed: "1"
   default_max_fan_speed: "2"
-
-# Полный поток DEBUG остаётся доступен через ESPHome API. В Home Assistant
-# публикуются только сообщения INFO+ нашего пакета; Recorder сохраняет историю
-# diagnostic text sensor и позволяет разобрать уже завершившийся ребут.
-logger:
-  level: DEBUG
-  on_message:
-    level: INFO
-    then:
-      - lambda: |-
-          if (strcmp(tag, "tion_auto_mode") != 0) {
-            return;
-          }
-          std::string entry = std::string("[") + to_string(millis() / 1000) +
-                              "s] " + message;
-          if (entry.size() > 220) {
-            entry.resize(220);
-          }
-          id(auto_mode_log).publish_state(entry);
 
 # ---------------------------------------------------------------------------
 # Защита от ложного выключения power_mode после рестарта HA / ребута ESP.
@@ -159,17 +140,28 @@ esphome:
               id(saved_max_fan_speed) = static_cast<int>(std::lround(restored_max));
               ESP_LOGI("tion_auto_mode", "fan speed range restored: %d..%d",
                        id(saved_min_fan_speed), id(saved_max_fan_speed));
+              char message[48];
+              snprintf(message, sizeof(message), "range restored: %d..%d",
+                       id(saved_min_fan_speed), id(saved_max_fan_speed));
+              id(auto_mode_log).publish_state(message);
             } else if (backup_valid) {
               ESP_LOGW("tion_auto_mode", "number range is invalid, restoring backup: %d..%d",
                        backup_min, backup_max);
               id(min_fan_speed).publish_state(backup_min);
               id(max_fan_speed).publish_state(backup_max);
+              char message[48];
+              snprintf(message, sizeof(message), "backup restored: %d..%d", backup_min, backup_max);
+              id(auto_mode_log).publish_state(message);
             } else {
               ESP_LOGW("tion_auto_mode", "number and backup ranges are invalid, using defaults");
               id(min_fan_speed).publish_state(${default_min_fan_speed});
               id(max_fan_speed).publish_state(${default_max_fan_speed});
               id(saved_min_fan_speed) = ${default_min_fan_speed};
               id(saved_max_fan_speed) = ${default_max_fan_speed};
+              char message[48];
+              snprintf(message, sizeof(message), "defaults used: %d..%d",
+                       id(saved_min_fan_speed), id(saved_max_fan_speed));
+              id(auto_mode_log).publish_state(message);
             }
         # Даём tion-компоненту установить связь с железом и отдать реальное
         # состояние, прежде чем принимать решения по power_mode.
@@ -868,6 +860,9 @@ number:
           id(saved_min_fan_speed) = new_min;
           id(saved_max_fan_speed) = new_max;
           ESP_LOGI("tion_auto_mode", "fan speed backup saved: %d..%d", new_min, new_max);
+          char message[48];
+          snprintf(message, sizeof(message), "backup saved: %d..%d", new_min, new_max);
+          id(auto_mode_log).publish_state(message);
       - if:
           condition:
             lambda: |-
@@ -927,6 +922,9 @@ number:
           id(saved_min_fan_speed) = new_min;
           id(saved_max_fan_speed) = new_max;
           ESP_LOGI("tion_auto_mode", "fan speed backup saved: %d..%d", new_min, new_max);
+          char message[48];
+          snprintf(message, sizeof(message), "backup saved: %d..%d", new_min, new_max);
+          id(auto_mode_log).publish_state(message);
       - if:
           condition:
             lambda: |-
