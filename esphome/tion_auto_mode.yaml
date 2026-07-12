@@ -73,7 +73,7 @@ substitutions:
   # временем компиляции — чтобы по состоянию сущности сразу видеть, что именно
   # залито на устройство, и не сверять поведение с git вслепую.
   # Поднимать вручную при изменении логики пакета.
-  tion_auto_mode_version: "2026.07.12"
+  tion_auto_mode_version: "2026.07.12.1"
 
   # Аварийный диапазон скоростей. Используется и как initial_value у
   # number.min/max_fan_speed, и как fallback в on_boot, если restore не вернул
@@ -149,11 +149,11 @@ esphome:
                   then:
                     - script.execute:
                         id: set_fan_speed
-                        fan_speed: !lambda 'return int(id(min_fan_speed).state);'
+                        fan_speed: !lambda 'return static_cast<int>(std::lround(id(min_fan_speed).state));'
               - script.execute:
                   id: sync_pid_mode
-                  min: !lambda 'return int(id(min_fan_speed).state);'
-                  max: !lambda 'return int(id(max_fan_speed).state);'
+                  min: !lambda 'return static_cast<int>(std::lround(id(min_fan_speed).state));'
+                  max: !lambda 'return static_cast<int>(std::lround(id(max_fan_speed).state));'
 
 api:
   on_client_connected:
@@ -183,6 +183,9 @@ api:
         value: !lambda |-
           const float s = id(current_fan_speed).state;
           return std::isnan(s) ? id(last_set_speed) : static_cast<int>(std::lround(s));
+    - globals.set:
+        id: fan_speed_baseline_pending
+        value: !lambda 'return std::isnan(id(current_fan_speed).state);'
 
 globals:
   # Последняя скорость, которую алгоритм отправил на бризер.
@@ -192,15 +195,25 @@ globals:
     restore_value: yes
     initial_value: '-1'
 
+  # Первый валидный отчёт скорости после старта ESP / reconnect с неизвестной
+  # скоростью — это baseline железа, а не команда с пульта. Иначе при min/max
+  # == NaN ранний отчёт fan_speed=1 схлопывает диапазон в min=max=1.
+  - id: fan_speed_baseline_pending
+    type: bool
+    restore_value: no
+    initial_value: 'true'
+
   # millis() до которого on_value НЕ интерпретирует расхождение как «пульт».
   # Взводится при отправке команды смены скорости: пока железо догоняет команду,
   # оно несколько секунд эхит ещё старую скорость. Без этого окна такой эхо-отчёт
   # ложно опознавался бы как ручное изменение с пульта → min=max=старая, PID off.
+  # Начальное значение тоже не 0: первые отчёты скорости при старте ESP часто
+  # приходят раньше on_boot, и их нельзя принимать за ручное управление.
   # Тот же приём, что settle_until в tion_intake_3s/4s.yaml.
   - id: fan_speed_settle_until
     type: uint32_t
     restore_value: no
-    initial_value: '0'
+    initial_value: '30000'
 
 # Диагностика: что за прошивка реально стоит на устройстве.
 # Версия пакета (substitution выше) + версия ESPHome + время компиляции, которое
@@ -240,14 +253,24 @@ sensor:
       then:
         - if:
             condition:
+              lambda: 'return id(fan_speed_baseline_pending) && !std::isnan(x);'
+            then:
+              - globals.set:
+                  id: last_set_speed
+                  value: !lambda 'return static_cast<int>(std::lround(x));'
+              - globals.set:
+                  id: fan_speed_baseline_pending
+                  value: !lambda 'return false;'
+        - if:
+            condition:
               and:
                 # расхождение с нашим намерением = действие пультом...
-                - lambda: 'return int(x) != id(last_set_speed);'
+                - lambda: 'return !std::isnan(x) && static_cast<int>(std::lround(x)) != id(last_set_speed);'
                 # ...но только вне окна устаканивания (иначе это эхо нашей команды)
                 - lambda: 'return millis() >= id(fan_speed_settle_until);'
                 # speed 0 — это не смена скорости, а остановка/выключение;
                 # выключение обрабатывается в on_state по mode == OFF
-                - lambda: 'return int(x) > 0;'
+                - lambda: 'return !std::isnan(x) && static_cast<int>(std::lround(x)) > 0;'
                 # в тихом режиме смену скорости с пульта игнорируем: silent_mode
                 # всё равно держит 1 и перебьёт её при следующем обновлении CO₂.
                 # Тронуть min/max здесь — испортить диапазон, к которому вернёмся
@@ -258,15 +281,15 @@ sensor:
               # с этой же скоростью больше не считались действием пультом
               - globals.set:
                   id: last_set_speed
-                  value: !lambda 'return int(x);'
+                  value: !lambda 'return static_cast<int>(std::lround(x));'
               # пульт сменил скорость → фиксируем её: min = max = speed, PID off
               - lambda: |-
                   id(min_fan_speed).publish_state(x);
                   id(max_fan_speed).publish_state(x);
               - script.execute:
                   id: sync_pid_mode
-                  min: !lambda 'return int(x);'
-                  max: !lambda 'return int(x);'
+                  min: !lambda 'return static_cast<int>(std::lround(x));'
+                  max: !lambda 'return static_cast<int>(std::lround(x));'
 
   # Текущий CO₂ — зеркало внешнего сенсора из HA; используется как вход для PID.
   # internal: false ОБЯЗАТЕЛЬНО: для platform: homeassistant дефолт — internal: true
@@ -377,7 +400,9 @@ climate:
               - switch.is_on: power_mode
               - lambda: 'return id(last_set_speed) != 0;'
               - lambda: 'return millis() >= id(fan_speed_settle_until);'
-              - lambda: 'return !std::isnan(id(min_fan_speed).state);'
+              - lambda: |-
+                  return !std::isnan(id(min_fan_speed).state) &&
+                         !std::isnan(id(max_fan_speed).state);
           then:
             - logger.log: "climate.tion_climate_current: on_state: turn power_mode off (remote)"
             - switch.turn_off: power_mode
@@ -390,7 +415,9 @@ climate:
           condition:
             and:
               - lambda: 'return id(tion_climate_current).mode != CLIMATE_MODE_OFF;'
-              - lambda: 'return int(id(current_fan_speed).state) > 0;'
+              - lambda: |-
+                  const float speed = id(current_fan_speed).state;
+                  return !std::isnan(speed) && static_cast<int>(std::lround(speed)) > 0;
               - lambda: 'return millis() >= id(fan_speed_settle_until);'
               - switch.is_off: power_mode
           then:
@@ -491,7 +518,10 @@ script:
           value: !lambda 'return fan_speed;'
       - if:
           condition:
-            lambda: 'return fan_speed != int(id(current_fan_speed).state);'
+            lambda: |-
+              const float current_speed = id(current_fan_speed).state;
+              return std::isnan(current_speed) ||
+                     fan_speed != static_cast<int>(std::lround(current_speed));
           then:
             # Реально меняем скорость → взводим окно устаканивания: пока железо
             # догоняет команду и эхит старую скорость, on_value не примет эхо за пульт.
@@ -560,15 +590,29 @@ switch:
       - logger.log: "switch.power_mode: turn_on_action"
       - if:
           condition:
-            lambda: 'return int(id(current_fan_speed).state) == 0;'
+            lambda: |-
+              const float speed = id(current_fan_speed).state;
+              return std::isnan(speed) || static_cast<int>(std::lround(speed)) == 0;
           then:
             - script.execute:
                 id: set_fan_speed
-                fan_speed: !lambda 'return int(id(min_fan_speed).state);'
+                fan_speed: !lambda |-
+                  const float min_speed = id(min_fan_speed).state;
+                  return std::isnan(min_speed)
+                    ? ${default_min_fan_speed}
+                    : static_cast<int>(std::lround(min_speed));
       - script.execute:
           id: sync_pid_mode
-          min: !lambda 'return int(id(min_fan_speed).state);'
-          max: !lambda 'return int(id(max_fan_speed).state);'
+          min: !lambda |-
+            const float min_speed = id(min_fan_speed).state;
+            return std::isnan(min_speed)
+              ? ${default_min_fan_speed}
+              : static_cast<int>(std::lround(min_speed));
+          max: !lambda |-
+            const float max_speed = id(max_fan_speed).state;
+            return std::isnan(max_speed)
+              ? ${default_max_fan_speed}
+              : static_cast<int>(std::lround(max_speed));
     turn_off_action:
       - logger.log: "switch.power_mode: turn_off_action"
       # Взводим окно устаканивания: после выключения железо несколько секунд
@@ -606,7 +650,11 @@ switch:
       - logger.log: "switch.heater_mode: turn_on_action"
       - if:
           condition:
-            lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY && int(id(current_fan_speed).state) > 0;'
+            lambda: |-
+              const float speed = id(current_fan_speed).state;
+              return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY &&
+                     !std::isnan(speed) &&
+                     static_cast<int>(std::lround(speed)) > 0;
           then:
             - climate.control: { id: tion_climate_current, mode: "HEAT" }
       - switch.turn_on: power_mode
@@ -614,7 +662,11 @@ switch:
       - logger.log: "switch.heater_mode: turn_off_action"
       - if:
           condition:
-            lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT && int(id(current_fan_speed).state) > 0;'
+            lambda: |-
+              const float speed = id(current_fan_speed).state;
+              return id(tion_climate_current).mode == CLIMATE_MODE_HEAT &&
+                     !std::isnan(speed) &&
+                     static_cast<int>(std::lround(speed)) > 0;
           then:
             - climate.control: { id: tion_climate_current, mode: "FAN_ONLY" }
       - switch.turn_on: power_mode
@@ -652,11 +704,23 @@ switch:
           then:
             - script.execute:
                 id: set_fan_speed
-                fan_speed: !lambda 'return int(id(min_fan_speed).state);'
+                fan_speed: !lambda |-
+                  const float min_speed = id(min_fan_speed).state;
+                  return std::isnan(min_speed)
+                    ? ${default_min_fan_speed}
+                    : static_cast<int>(std::lround(min_speed));
             - script.execute:
                 id: sync_pid_mode
-                min: !lambda 'return int(id(min_fan_speed).state);'
-                max: !lambda 'return int(id(max_fan_speed).state);'
+                min: !lambda |-
+                  const float min_speed = id(min_fan_speed).state;
+                  return std::isnan(min_speed)
+                    ? ${default_min_fan_speed}
+                    : static_cast<int>(std::lround(min_speed));
+                max: !lambda |-
+                  const float max_speed = id(max_fan_speed).state;
+                  return std::isnan(max_speed)
+                    ? ${default_max_fan_speed}
+                    : static_cast<int>(std::lround(max_speed));
 
 # Числовые сущности для задания целевого CO₂, температуры нагрева и допустимого диапазона скоростей
 number:
@@ -677,7 +741,11 @@ number:
       - logger.log: "number.heater_temperature: set_action"
       - if:
           condition:
-            lambda: 'return x != id(tion_climate_current).target_temperature && int(id(current_fan_speed).state) > 0;'
+            lambda: |-
+              const float speed = id(current_fan_speed).state;
+              return x != id(tion_climate_current).target_temperature &&
+                     !std::isnan(speed) &&
+                     static_cast<int>(std::lround(speed)) > 0;
           then:
             - climate.control:
                 id: tion_climate_current
@@ -728,7 +796,9 @@ number:
       - logger.log: "number.min_fan_speed: set_action"
       - if:
           condition:
-            lambda: 'return x > id(max_fan_speed).state;'
+            lambda: |-
+              const float max_speed = id(max_fan_speed).state;
+              return std::isnan(max_speed) || x > max_speed;
           then:
             - number.set:
                 id: max_fan_speed
@@ -738,19 +808,25 @@ number:
             and:
               - switch.is_on: power_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x > int(id(current_fan_speed).state);'
+              - lambda: |-
+                  const float speed = id(current_fan_speed).state;
+                  return std::isnan(speed) || x > static_cast<int>(std::lround(speed));
           then:
             - script.execute:
                 id: set_fan_speed
-                fan_speed: !lambda 'return x;'
+                fan_speed: !lambda 'return static_cast<int>(std::lround(x));'
       - if:
           condition:
             switch.is_on: power_mode
           then:
             - script.execute:
                 id: sync_pid_mode
-                min: !lambda 'return int(x);'
-                max: !lambda 'return int(id(max_fan_speed).state);'
+                min: !lambda 'return static_cast<int>(std::lround(x));'
+                max: !lambda |-
+                  const float max_speed = id(max_fan_speed).state;
+                  return std::isnan(max_speed)
+                    ? static_cast<int>(std::lround(x))
+                    : static_cast<int>(std::lround(max_speed));
 
   # max_fan_speed — верхняя граница диапазона. Если новый max < min, опускает min следом.
   # Немедленно применяет скорость, если бризер работает и текущая скорость выше нового max.
@@ -769,7 +845,9 @@ number:
       - logger.log: "number.max_fan_speed: set_action"
       - if:
           condition:
-            lambda: 'return x < id(min_fan_speed).state;'
+            lambda: |-
+              const float min_speed = id(min_fan_speed).state;
+              return std::isnan(min_speed) || x < min_speed;
           then:
             - number.set:
                 id: min_fan_speed
@@ -779,16 +857,22 @@ number:
             and:
               - switch.is_on: power_mode
               - switch.is_off: silent_mode
-              - lambda: 'return x < int(id(current_fan_speed).state);'
+              - lambda: |-
+                  const float speed = id(current_fan_speed).state;
+                  return std::isnan(speed) || x < static_cast<int>(std::lround(speed));
           then:
             - script.execute:
                 id: set_fan_speed
-                fan_speed: !lambda 'return x;'
+                fan_speed: !lambda 'return static_cast<int>(std::lround(x));'
       - if:
           condition:
             switch.is_on: power_mode
           then:
             - script.execute:
                 id: sync_pid_mode
-                min: !lambda 'return int(id(min_fan_speed).state);'
-                max: !lambda 'return int(x);'
+                min: !lambda |-
+                  const float min_speed = id(min_fan_speed).state;
+                  return std::isnan(min_speed)
+                    ? static_cast<int>(std::lround(x))
+                    : static_cast<int>(std::lround(min_speed));
+                max: !lambda 'return static_cast<int>(std::lround(x));'
