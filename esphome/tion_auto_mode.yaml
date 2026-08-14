@@ -35,6 +35,15 @@
 #       · PID включается (COOL) если min != max и power включён
 #       · PID выключается (OFF) если min == max
 #
+# Журнал причин (mode_change_log):
+#   Каждая ветка принятия решения выше публикует причину в text_sensor
+#   mode_change_log через script log_mode_change. Логируется только то, чего
+#   Home Assistant в принципе не видит: решения самой прошивки и команды,
+#   пришедшие в железо мимо HA. Обычные вызовы power_mode/silent_mode из HA
+#   намеренно НЕ логируются — у них в HA есть полноценный контекст
+#   (пользователь, автоматизация, расписание), и дублировать его тут значило бы
+#   писать в журнал шум. Шаги PID между ненулевыми скоростями тоже не пишутся.
+#
 # Создаёт сущности в HA (префикс = esphome: name):
 #   switch.power_mode          — включение / выключение бризера
 #   switch.heater_mode         — режим нагрева воздуха
@@ -47,6 +56,7 @@
 #   sensor.current_co2         — текущий CO₂ (зеркало внешнего сенсора)
 #   sensor.target_co2_sensor   — целевой CO₂ (для отображения на графиках)
 #   sensor.firmware_build      — версия пакета + версия ESPHome + время сборки
+#   sensor.mode_change_log     — причина каждого переключения режима (см. ниже)
 #
 # Требует:
 #   substitutions.auto_mode_co2_sensor — entity_id сенсора CO₂ в HA
@@ -73,7 +83,7 @@ substitutions:
   # временем компиляции — чтобы по состоянию сущности сразу видеть, что именно
   # залито на устройство, и не сверять поведение с git вслепую.
   # Поднимать вручную при изменении логики пакета.
-  tion_auto_mode_version: "2026.08.09.1"
+  tion_auto_mode_version: "2026.08.14.1"
 
   # Аварийный диапазон скоростей. Используется и как initial_value у
   # number.min/max_fan_speed, и как fallback в on_boot, если restore не вернул
@@ -169,6 +179,14 @@ esphome:
         - globals.set:
             id: fan_speed_settle_until
             value: !lambda 'return millis() + 30000;'
+        # Отметка старта: отделяет «прошивка перезапустилась» от «кто-то
+        # переключил». Все последующие записи в этом бою идут после неё.
+        - script.execute:
+            id: log_mode_change
+            reason: !lambda |-
+              return std::string("boot: power ") + (id(power_mode).state ? "on" : "off") +
+                     ", heat " + (id(desired_heater_mode) ? "on" : "off") +
+                     (id(heater_mode_apply_pending) ? ", pending" : "");
         - if:
             condition:
               switch.is_on: power_mode
@@ -184,6 +202,9 @@ esphome:
                       const float speed = id(current_fan_speed).state;
                       return !std::isnan(speed) && int(speed) == 0;
                   then:
+                    - script.execute:
+                        id: log_mode_change
+                        reason: "boot: reapply power on"
                     - script.execute:
                         id: set_fan_speed
                         fan_speed: !lambda 'return static_cast<int>(std::lround(id(min_fan_speed).state));'
@@ -281,6 +302,17 @@ globals:
     restore_value: yes
     initial_value: 'false'
 
+  # Счётчик записей mode_change_log. Нужен только чтобы каждая публикация была
+  # уникальной строкой: HA не пишет в recorder новое состояние, если текстовый
+  # сенсор отдал ровно то же значение, и два одинаковых события подряд
+  # («power off: remote» дважды за сутки) слились бы в одну запись истории.
+  # restore_value: no — после ребута нумерация начинается заново, это нормально:
+  # сам ребут виден по uptime и по записи boot в логе.
+  - id: mode_log_seq
+    type: uint16_t
+    restore_value: no
+    initial_value: '0'
+
 # Диагностика: что за прошивка реально стоит на устройстве.
 # Версия пакета (substitution выше) + версия ESPHome + время компиляции, которое
 # для OTA фактически совпадает с моментом установки. Нужно, чтобы при разборе
@@ -290,6 +322,33 @@ text_sensor:
     name: "Auto Mode Log"
     id: auto_mode_log
     icon: "mdi:text-box-search-outline"
+    entity_category: diagnostic
+
+  # Причина каждого переключения режима, как её видит сама прошивка.
+  #
+  # Зачем отдельный сенсор, если есть logger.log. Все решения ниже уже пишутся
+  # в лог ESPHome, но он живёт только пока открыт поток логов и теряется при
+  # ребуте. Home Assistant видит лишь результат («стало off»), причём device-report
+  # от Tion приходит без context_user_id и без parent_id — по истории HA нельзя
+  # отличить команду HA от команды, пришедшей в железо мимо HA.
+  # publish_state отдаёт причину в HA, и recorder хранит её вместе с историей
+  # остальных сущностей бризера.
+  #
+  # Формат записи: "#<seq> <что>: <кем>", например
+  #   power off: remote        — железо отчиталось mode == OFF, команду слали не мы
+  #   power off: ha            — сработал power_mode.turn_off_action
+  #   heat on: hw report       — железо вернуло HEAT, switch лишь зеркалирует факт
+  #   heat on: pending apply   — применено отложенное желание после старта вентилятора
+  #   speed 3: remote          — скорость разошлась с last_set_speed вне окна settle
+  #   fan 0->2 / fan 3->0      — переход через ноль, отправленный алгоритмом
+  #
+  # `remote` здесь означает ровно «команда пришла в железо не от этой прошивки»:
+  # кнопка на панели бризера, пульт или приложение Tion по BLE через 3s_proxy.
+  # Различить эти три источника прошивка пока не умеет.
+  - platform: template
+    name: "Mode Change Log"
+    id: mode_change_log
+    icon: "mdi:swap-horizontal-bold"
     entity_category: diagnostic
 
   - platform: template
@@ -349,6 +408,11 @@ sensor:
                 # при выключении silent_mode.
                 - switch.is_off: silent_mode
             then:
+              - script.execute:
+                  id: log_mode_change
+                  reason: !lambda |-
+                    return "speed " + to_string(static_cast<int>(std::lround(x))) +
+                           ": remote (was " + to_string(id(last_set_speed)) + ")";
               # синхронизируем намерение с фактом, чтобы повторные отчёты железа
               # с этой же скоростью больше не считались действием пультом
               - globals.set:
@@ -437,12 +501,18 @@ climate:
                         lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
                       then:
                         - logger.log: "heater mode pending confirmed: heat"
+                        - script.execute:
+                            id: log_mode_change
+                            reason: "heat on: pending confirmed"
                         - lambda: 'id(heater_mode).publish_state(true);'
                         - globals.set:
                             id: heater_mode_apply_pending
                             value: 'false'
                       else:
                         - logger.log: "heater mode pending apply: heat"
+                        - script.execute:
+                            id: log_mode_change
+                            reason: "heat on: pending apply"
                         - climate.control: { id: tion_climate_current, mode: "HEAT" }
                         - lambda: 'id(heater_mode).publish_state(true);'
                 else:
@@ -451,12 +521,18 @@ climate:
                         lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY;'
                       then:
                         - logger.log: "heater mode pending confirmed: fan_only"
+                        - script.execute:
+                            id: log_mode_change
+                            reason: "heat off: pending confirmed"
                         - lambda: 'id(heater_mode).publish_state(false);'
                         - globals.set:
                             id: heater_mode_apply_pending
                             value: 'false'
                       else:
                         - logger.log: "heater mode pending apply: fan_only"
+                        - script.execute:
+                            id: log_mode_change
+                            reason: "heat off: pending apply"
                         - climate.control: { id: tion_climate_current, mode: "FAN_ONLY" }
                         - lambda: 'id(heater_mode).publish_state(false);'
       # Синхронизация heater_mode с железом через publish_state, а НЕ turn_on/off.
@@ -473,6 +549,12 @@ climate:
               - lambda: 'return !id(heater_mode_apply_pending);'
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode on"
+            # Именно эта ветка делает желание постоянным: один «честный» HEAT от
+            # Tion — и дальше каждый старт вентилятора уходит в нагрев. Диагностика
+            # ночного «сам включил нагрев» начинается с этой записи.
+            - script.execute:
+                id: log_mode_change
+                reason: "heat on: hw report"
             - lambda: |-
                 id(desired_heater_mode) = true;
                 id(heater_mode).publish_state(true);
@@ -484,6 +566,9 @@ climate:
               - lambda: 'return !id(heater_mode_apply_pending);'
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode off"
+            - script.execute:
+                id: log_mode_change
+                reason: "heat off: hw report"
             - lambda: |-
                 id(desired_heater_mode) = false;
                 id(heater_mode).publish_state(false);
@@ -531,6 +616,12 @@ climate:
                          !std::isnan(id(max_fan_speed).state);
           then:
             - logger.log: "climate.tion_climate_current: on_state: turn power_mode off (remote)"
+            # Единственное место, где фиксируется «бризер выключили не мы». Именно
+            # эта запись отвечает на вопрос «почему бризер сам выключился»:
+            # все guards выше уже отсеяли эхо нашей команды, ребут и NaN-диапазон.
+            - script.execute:
+                id: log_mode_change
+                reason: "power off: remote"
             - switch.turn_off: power_mode
       # Включение бризера с пульта: mode != OFF и вентилятор реально крутится.
       #   - fan_speed > 0: переходное состояние при выключении (mode ещё не OFF,
@@ -548,6 +639,9 @@ climate:
               - switch.is_off: power_mode
           then:
             - logger.log: "climate.tion_climate_current: on_state: turn power_mode on"
+            - script.execute:
+                id: log_mode_change
+                reason: "power on: remote"
             - switch.turn_on: power_mode
 
 # PID-контроллер управляет скоростью бризера в автоматическом режиме.
@@ -632,6 +726,22 @@ output:
 # Каждый вызов фиксирует намерение в last_set_speed — это «эталон», с которым
 # on_value сравнивает отчёты железа, чтобы отличить наши команды от пульта.
 script:
+  # Единая точка публикации причины в mode_change_log.
+  # mode: parallel — тело синхронное (одна лямбда без ожиданий), но при single
+  # вложенный вызов из соседнего обработчика был бы молча отброшен с warning.
+  - id: log_mode_change
+    mode: parallel
+    parameters:
+      reason: string
+    then:
+      - lambda: |-
+          id(mode_log_seq)++;
+          char message[64];
+          snprintf(message, sizeof(message), "#%u %s",
+                   static_cast<unsigned>(id(mode_log_seq)), reason.c_str());
+          ESP_LOGI("tion_auto_mode", "mode change: %s", message);
+          id(mode_change_log).publish_state(message);
+
   - id: set_fan_speed
     parameters:
       fan_speed: int
@@ -656,6 +766,25 @@ script:
             - globals.set:
                 id: fan_speed_settle_until
                 value: !lambda 'return millis() + 5000;'
+            # Логируем только переход через ноль (пуск и остановка вентилятора).
+            # Обычные шаги PID (1↔2↔3) сюда не попадают: их несколько раз в час,
+            # и журнал причин утонул бы в них. Кто именно инициировал пуск или
+            # остановку, видно по соседней записи (power/heater/silent/boot).
+            - if:
+                condition:
+                  lambda: |-
+                    const float current_speed = id(current_fan_speed).state;
+                    const int current = std::isnan(current_speed)
+                      ? -1 : static_cast<int>(std::lround(current_speed));
+                    return (fan_speed == 0) != (current == 0);
+                then:
+                  - script.execute:
+                      id: log_mode_change
+                      reason: !lambda |-
+                        const float current_speed = id(current_fan_speed).state;
+                        const std::string from = std::isnan(current_speed)
+                          ? "?" : to_string(static_cast<int>(std::lround(current_speed)));
+                        return "fan " + from + "->" + to_string(fan_speed);
             - if:
                 condition:
                   lambda: 'return fan_speed > 0;'
@@ -785,12 +914,20 @@ switch:
                      !std::isnan(speed) &&
                      static_cast<int>(std::lround(speed)) > 0;
           then:
+            - script.execute:
+                id: log_mode_change
+                reason: "heat on: ha"
             - climate.control: { id: tion_climate_current, mode: "HEAT" }
             - globals.set:
                 id: heater_mode_apply_pending
                 value: 'false'
           else:
             - logger.log: "heater mode desired: on; apply pending"
+            # Команда в железо сейчас не уходит (бризер стоит) — без этой записи
+            # разрыв между «HA показал heat» и реальным режимом Tion не виден.
+            - script.execute:
+                id: log_mode_change
+                reason: "heat on: ha, apply pending"
             - globals.set:
                 id: heater_mode_apply_pending
                 value: 'true'
@@ -808,12 +945,19 @@ switch:
                      !std::isnan(speed) &&
                      static_cast<int>(std::lround(speed)) > 0;
           then:
+            - script.execute:
+                id: log_mode_change
+                reason: "heat off: ha"
             - climate.control: { id: tion_climate_current, mode: "FAN_ONLY" }
             - globals.set:
                 id: heater_mode_apply_pending
                 value: 'false'
           else:
             - logger.log: "heater mode desired: off; apply pending"
+            # Ровно сценарий issue-006: HA показывает fan_only, Tion помнит HEAT.
+            - script.execute:
+                id: log_mode_change
+                reason: "heat off: ha, apply pending"
             - globals.set:
                 id: heater_mode_apply_pending
                 value: 'true'
