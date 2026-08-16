@@ -31,6 +31,12 @@
 #   - окно устаканивания (fan_speed_settle_until) гасит ложные срабатывания от эха:
 #     после нашей команды железо несколько секунд отдаёт ещё старое состояние.
 #     last_set_speed != 0 отличает выключение пультом от «0 выставили мы сами».
+#     Окно взводит КАЖДАЯ уходящая в железо команда — скорость, питание, режим
+#     нагрева, целевая температура — через единый script arm_settle, и его
+#     проверяет КАЖДАЯ ветка, трактующая отчёт железа как чужое действие.
+#     Расхождение режима внутри окна не зеркалируется, а помечается pending:
+#     желаемое состояние додавливается на следующих отчётах (не более трёх
+#     попыток), после чего управление возвращается обычному зеркалированию.
 #   - min_fan_speed.set_action / max_fan_speed.set_action:
 #       · PID включается (COOL) если min != max и power включён
 #       · PID выключается (OFF) если min == max
@@ -83,7 +89,7 @@ substitutions:
   # временем компиляции — чтобы по состоянию сущности сразу видеть, что именно
   # залито на устройство, и не сверять поведение с git вслепую.
   # Поднимать вручную при изменении логики пакета.
-  tion_auto_mode_version: "2026.08.14.1"
+  tion_auto_mode_version: "2026.08.16.1"
 
   # Аварийный диапазон скоростей. Используется и как initial_value у
   # number.min/max_fan_speed, и как fallback в on_boot, если restore не вернул
@@ -176,9 +182,9 @@ esphome:
         # Даём tion-компоненту установить связь с железом и отдать реальное
         # состояние, прежде чем принимать решения по power_mode.
         - delay: 10s
-        - globals.set:
-            id: fan_speed_settle_until
-            value: !lambda 'return millis() + 30000;'
+        - script.execute:
+            id: arm_settle
+            ms: 30000
         # Отметка старта: отделяет «прошивка перезапустилась» от «кто-то
         # переключил». Все последующие записи в этом бою идут после неё.
         - script.execute:
@@ -217,9 +223,9 @@ api:
   on_client_connected:
     # Реконнект HA может совпасть с churn состояния — короткое окно не даёт
     # on_state принять переходный OFF за выключение с пульта.
-    - globals.set:
-        id: fan_speed_settle_until
-        value: !lambda 'return millis() + 15000;'
+    - script.execute:
+        id: arm_settle
+        ms: 15000
     # Пере-синхронизация эталона скорости с фактом железа при каждом реконнекте.
     #
     # Симптом: после перечитывания конфигурации HA (reload) бризер фиксировался
@@ -301,6 +307,16 @@ globals:
     type: bool
     restore_value: yes
     initial_value: 'false'
+
+  # Сколько раз внутри одного окна устаканивания мы уже пытались вернуть
+  # желаемый режим нагрева. Ограничитель: если железо трижды не подчинилось,
+  # это не эхо нашей команды, а его настоящее состояние — перестаём спорить и
+  # отдаём управление обычному зеркалированию. Без предела расхождение,
+  # которое устройство не умеет исполнить, крутилось бы вечно.
+  - id: heater_reassert_count
+    type: uint8_t
+    restore_value: no
+    initial_value: '0'
 
   # Счётчик записей mode_change_log. Нужен только чтобы каждая публикация была
   # уникальной строкой: HA не пишет в recorder новое состояние, если текстовый
@@ -522,6 +538,7 @@ climate:
                             id: log_mode_change
                             reason: "heat on: pending apply"
                         - climate.control: { id: tion_climate_current, mode: "HEAT" }
+                        - script.execute: { id: arm_settle, ms: 5000 }
                         - lambda: 'id(heater_mode).publish_state(true);'
                 else:
                   - if:
@@ -542,7 +559,53 @@ climate:
                             id: log_mode_change
                             reason: "heat off: pending apply"
                         - climate.control: { id: tion_climate_current, mode: "FAN_ONLY" }
+                        - script.execute: { id: arm_settle, ms: 5000 }
                         - lambda: 'id(heater_mode).publish_state(false);'
+      # Расхождение режима внутри окна устаканивания = последствие нашей же
+      # команды, а не решение пользователя.
+      #
+      # Зафиксированный случай (бризер Ани, 14.08.2026 23:00): слот расписания
+      # запустил вентилятор, мы отправили FAN_ONLY вместе со скоростью и целевой
+      # температурой; железо через 255 мс подтвердило FAN_ONLY, а ещё через
+      # 186 мс отдало HEAT. Зеркалирование ниже приняло это за действие пультом
+      # и переписало desired_heater_mode, после чего нагрев держался сутками.
+      # Ни расписание, ни HA, ни antifreeze (на улице было +24 °C) HEAT не
+      # просили.
+      #
+      # Вместо того чтобы поверить такому отчёту, помечаем режим как pending:
+      # существующий механизм выше сам додавит желаемое состояние на следующих
+      # отчётах и снимет pending, когда железо подтвердит. Это тот же приём,
+      # что автокоррекция заслонки в tion_intake_3s/4s.
+      #
+      # Предел попыток: если железо трижды не подчинилось, расхождение реально,
+      # а не эхо — отдаём управление обычному зеркалированию, чтобы не спорить с
+      # устройством вечно.
+      - if:
+          condition:
+            and:
+              - lambda: 'return millis() < id(fan_speed_settle_until);'
+              - lambda: 'return !id(heater_mode_apply_pending);'
+              - lambda: 'return id(heater_reassert_count) < 3;'
+              - lambda: 'return id(tion_climate_current).mode != CLIMATE_MODE_OFF;'
+              - lambda: |-
+                  const float speed = id(current_fan_speed).state;
+                  return !std::isnan(speed) && static_cast<int>(std::lround(speed)) > 0;
+              - lambda: |-
+                  const bool hardware_heat =
+                    id(tion_climate_current).mode == CLIMATE_MODE_HEAT;
+                  return hardware_heat != id(desired_heater_mode);
+          then:
+            - logger.log: "heater mode mismatch inside settle window: re-assert desired"
+            - script.execute:
+                id: log_mode_change
+                reason: !lambda |-
+                  return std::string("heat ") + (id(desired_heater_mode) ? "on" : "off") +
+                         ": settle mismatch, re-assert";
+            - globals.set:
+                id: heater_mode_apply_pending
+                value: 'true'
+            - lambda: 'id(heater_reassert_count)++;'
+
       # Синхронизация heater_mode с железом через publish_state, а НЕ turn_on/off.
       # turn_on/off heater_mode безусловно включают power_mode (намеренно — для
       # ручного нажатия на карточке). Но здесь это лишь отражение состояния железа:
@@ -555,6 +618,9 @@ climate:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
               - switch.is_off: heater_mode
               - lambda: 'return !id(heater_mode_apply_pending);'
+              # Вне окна устаканивания: внутри него отчёт железа мог быть эхом
+              # или побочным эффектом нашей же команды, и его разбирает блок выше.
+              - lambda: 'return millis() >= id(fan_speed_settle_until);'
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode on"
             # Именно эта ветка делает желание постоянным: один «честный» HEAT от
@@ -572,6 +638,7 @@ climate:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_FAN_ONLY;'
               - switch.is_on: heater_mode
               - lambda: 'return !id(heater_mode_apply_pending);'
+              - lambda: 'return millis() >= id(fan_speed_settle_until);'
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_mode off"
             - script.execute:
@@ -597,6 +664,9 @@ climate:
             and:
               - lambda: 'return id(tion_climate_current).mode == CLIMATE_MODE_HEAT;'
               - lambda: 'return id(tion_climate_current).target_temperature != id(heater_temperature).state;'
+              # Вне окна устаканивания: сразу после нашей команды железо ещё
+              # отдаёт прежнюю уставку, и она перетёрла бы только что заданную.
+              - lambda: 'return millis() >= id(fan_speed_settle_until);'
           then:
             - logger.log: "climate.tion_climate_current: on_state: set heater_temperature"
             - number.set:
@@ -734,6 +804,30 @@ output:
 # Каждый вызов фиксирует намерение в last_set_speed — это «эталон», с которым
 # on_value сравнивает отчёты железа, чтобы отличить наши команды от пульта.
 script:
+  # Единая точка взведения окна устаканивания.
+  #
+  # Правило: любая команда, уходящая в железо, взводит окно. Пока оно открыто,
+  # отчёты железа не считаются самостоятельным действием — устройство ещё
+  # догоняет команду и несколько сотен миллисекунд отдаёт старое или
+  # промежуточное состояние. Раньше окно взводили только смена скорости и
+  # выключение питания, поэтому команды смены режима и температуры оставались
+  # без защиты: отчёт HEAT через 186 мс после нашего же FAN_ONLY принимался за
+  # решение пользователя и переписывал желаемый режим.
+  #
+  # Сброс heater_reassert_count здесь обязателен: новая команда — новая
+  # попытка, лимит попыток считается в пределах одного окна.
+  - id: arm_settle
+    mode: parallel
+    parameters:
+      ms: int
+    then:
+      - globals.set:
+          id: fan_speed_settle_until
+          value: !lambda 'return millis() + ms;'
+      - globals.set:
+          id: heater_reassert_count
+          value: '0'
+
   # Единая точка публикации причины в mode_change_log.
   # mode: parallel — тело синхронное (одна лямбда без ожиданий), но при single
   # вложенный вызов из соседнего обработчика был бы молча отброшен с warning.
@@ -771,9 +865,9 @@ script:
             # догоняет команду и эхит старую скорость, on_value не примет эхо за пульт.
             # Взводим ТОЛЬКО здесь (не выше): иначе регулярные вызовы PID без смены
             # скорости держали бы окно открытым вечно и пульт не детектировался бы.
-            - globals.set:
-                id: fan_speed_settle_until
-                value: !lambda 'return millis() + 5000;'
+            - script.execute:
+                id: arm_settle
+                ms: 5000
             # Логируем только переход через ноль (пуск и остановка вентилятора).
             # Обычные шаги PID (1↔2↔3) сюда не попадают: их несколько раз в час,
             # и журнал причин утонул бы в них. Кто именно инициировал пуск или
@@ -882,9 +976,9 @@ switch:
       # эхит ещё старое рабочее состояние (mode != OFF, fan > 0). Без этого окна
       # on_state включал бы power_mode обратно. set_fan_speed ниже взведёт окно
       # только если реально пошлёт команду (current != 0), поэтому взводим явно.
-      - globals.set:
-          id: fan_speed_settle_until
-          value: !lambda 'return millis() + 5000;'
+      - script.execute:
+          id: arm_settle
+          ms: 5000
       - climate.control:
           id: pid_co2
           mode: 'OFF'
@@ -926,6 +1020,7 @@ switch:
                 id: log_mode_change
                 reason: "heat on: ha"
             - climate.control: { id: tion_climate_current, mode: "HEAT" }
+            - script.execute: { id: arm_settle, ms: 5000 }
             - globals.set:
                 id: heater_mode_apply_pending
                 value: 'false'
@@ -957,6 +1052,7 @@ switch:
                 id: log_mode_change
                 reason: "heat off: ha"
             - climate.control: { id: tion_climate_current, mode: "FAN_ONLY" }
+            - script.execute: { id: arm_settle, ms: 5000 }
             - globals.set:
                 id: heater_mode_apply_pending
                 value: 'false'
@@ -1050,6 +1146,7 @@ number:
             - climate.control:
                 id: tion_climate_current
                 target_temperature: !lambda 'return x;'
+            - script.execute: { id: arm_settle, ms: 5000 }
 
   # target_co2 — уставка PID-контроллера; применяется немедленно если PID включён
   - platform: template
