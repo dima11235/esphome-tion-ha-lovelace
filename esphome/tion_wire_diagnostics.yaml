@@ -25,9 +25,13 @@ uart:
         timeout: 10ms
       sequence:
         - lambda: |-
-            ESP_LOGD("tion_wire", "UART %s %s",
-                     direction == uart::UART_DIRECTION_TX ? "TX" : "RX",
-                     format_hex_pretty(bytes).c_str());
+            char hex[61];
+            for (size_t offset = 0; offset < bytes.size(); offset += 20) {
+              const size_t length = std::min(size_t(20), bytes.size() - offset);
+              format_hex_pretty_to(hex, sizeof(hex), bytes.data() + offset, length, '.');
+              ESP_LOGD("tion_wire", "UART %s %s",
+                       direction == uart::UART_DIRECTION_TX ? "TX" : "RX", hex);
+            }
   - id: !extend tion_uart_proxy
     debug:
       direction: BOTH
@@ -37,6 +41,10 @@ uart:
         timeout: 10ms
       sequence:
         - lambda: |-
-            ESP_LOGD("tion_wire", "BLE %s %s",
-                     direction == uart::UART_DIRECTION_TX ? "TX" : "RX",
-                     format_hex_pretty(bytes).c_str());
+            char hex[61];
+            for (size_t offset = 0; offset < bytes.size(); offset += 20) {
+              const size_t length = std::min(size_t(20), bytes.size() - offset);
+              format_hex_pretty_to(hex, sizeof(hex), bytes.data() + offset, length, '.');
+              ESP_LOGD("tion_wire", "BLE %s %s",
+                       direction == uart::UART_DIRECTION_TX ? "TX" : "RX", hex);
+            }
