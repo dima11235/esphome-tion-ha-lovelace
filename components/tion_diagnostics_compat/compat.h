@@ -12,13 +12,13 @@
 namespace esphome {
 inline std::string format_hex_pretty(const uint8_t *data, size_t size,
                                     char separator = '.', bool show_length = true) {
-  static constexpr char HEX[] = "0123456789ABCDEF";
+  static constexpr char DIGITS[] = "0123456789ABCDEF";
   std::string result;
   result.reserve(size * 3 + 16);
   for (size_t i = 0; i < size; ++i) {
     if (i && separator) result.push_back(separator);
-    result.push_back(HEX[data[i] >> 4]);
-    result.push_back(HEX[data[i] & 15]);
+    result.push_back(DIGITS[data[i] >> 4]);
+    result.push_back(DIGITS[data[i] & 15]);
   }
   if (show_length && size > 4) {
     char suffix[24];
