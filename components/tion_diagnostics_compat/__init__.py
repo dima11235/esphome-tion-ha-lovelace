@@ -1,4 +1,4 @@
-"""Restore formatting helpers still used by dentra's Tion driver on ESPHome 2026.11."""
+"""Include relocated formatting declarations for Tion on ESPHome 2026.11."""
 import esphome.codegen as cg
 import esphome.config_validation as cv
 
