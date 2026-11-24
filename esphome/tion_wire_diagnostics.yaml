@@ -1,5 +1,15 @@
 # Passive byte capture for Tion 3S with the stock BLE proxy. Opt-in per device.
 # No dummy receiver: the existing drivers remain the only UART consumers.
+esphome:
+  min_version: "2026.11.0"
+
+external_components:
+  - source: github://dima11235/esphome-tion-ha-lovelace@main
+    components: [tion_diagnostics_compat]
+    refresh: 0s
+
+tion_diagnostics_compat:
+
 logger:
   level: DEBUG
   baud_rate: 0
